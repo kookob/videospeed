@@ -6,7 +6,7 @@
  */
 
 import { afterAll, beforeAll, beforeEach } from 'vitest';
-import { installChromeMock, resetMockStorage } from './chrome-mock.js';
+import { cancelPendingMockCallbacks, installChromeMock, resetMockStorage } from './chrome-mock.js';
 import { loadInjectModules } from './module-loader.js';
 
 // Install Chrome extension API mock
@@ -78,10 +78,12 @@ beforeAll(async () => {
   await loadInjectModules();
 });
 
-// Loading inject.js starts the extension's idle-deferred startup chain. Tear it
-// down so callbacks still queued when a short test file ends return early
-// instead of running after jsdom is gone (`window is not defined`).
+// Loading inject.js starts the extension's async startup chain (mock storage
+// reads, then idle callbacks). When a short test file ends, cancel pending mock
+// callbacks and tear the extension down so queued idle callbacks return early,
+// instead of either running after jsdom is gone (`window is not defined`).
 afterAll(() => {
+  cancelPendingMockCallbacks();
   try {
     window.VSC_controller?.teardown();
   } catch {

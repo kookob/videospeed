@@ -19,12 +19,29 @@ const mockStorage = {
 // Track onChanged listeners so set() can fire them
 const onChangedListeners = [];
 
+// Async mock callbacks are tracked so a finished test file can cancel them;
+// otherwise one could fire after jsdom is torn down ("window is not defined").
+const pendingTimers = new Set();
+function later(fn, ms) {
+  const id = setTimeout(() => {
+    pendingTimers.delete(id);
+    fn();
+  }, ms);
+  pendingTimers.add(id);
+}
+
+/** Cancel every mock callback that has not fired yet. */
+export function cancelPendingMockCallbacks() {
+  pendingTimers.forEach((id) => clearTimeout(id));
+  pendingTimers.clear();
+}
+
 export const chromeMock = {
   storage: {
     sync: {
       get: (keys, callback) => {
         // Simulate async behavior
-        setTimeout(() => {
+        later(() => {
           const result =
             typeof keys === 'object' && keys !== null
               ? Object.keys(keys).reduce((acc, key) => {
@@ -45,13 +62,13 @@ export const chromeMock = {
         Object.assign(mockStorage, items);
 
         // Fire onChanged listeners asynchronously (mirrors real chrome behavior)
-        setTimeout(() => {
+        later(() => {
           for (const listener of onChangedListeners) {
             listener(changes, 'sync');
           }
         }, 5);
 
-        setTimeout(() => {
+        later(() => {
           if (globalThis.chrome && callback) {
             callback();
           }
@@ -60,11 +77,11 @@ export const chromeMock = {
       remove: (keys, callback) => {
         const keysArray = Array.isArray(keys) ? keys : [keys];
         keysArray.forEach((key) => delete mockStorage[key]);
-        setTimeout(() => callback && callback(), 10);
+        later(() => callback && callback(), 10);
       },
       clear: (callback) => {
         Object.keys(mockStorage).forEach((key) => delete mockStorage[key]);
-        setTimeout(() => callback && callback(), 10);
+        later(() => callback && callback(), 10);
       },
     },
     onChanged: {
@@ -100,12 +117,12 @@ export const chromeMock = {
       ]);
     },
     sendMessage: (tabId, message, callback) => {
-      setTimeout(() => callback && callback({}), 10);
+      later(() => callback && callback({}), 10);
     },
   },
   action: {
     setIcon: (details, callback) => {
-      setTimeout(() => callback && callback(), 10);
+      later(() => callback && callback(), 10);
     },
   },
 };
