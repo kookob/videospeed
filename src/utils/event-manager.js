@@ -37,17 +37,9 @@ class EventManager {
    * @param {Document} document - Document to attach events to
    */
   setupKeyboardShortcuts(document) {
-    const docs = [document];
-
-    try {
-      if (window.VSC.inIframe()) {
-        docs.push(window.top.document);
-      }
-    } catch {
-      // Cross-origin iframe - ignore
-    }
-
-    docs.forEach((doc) => {
+    // Each frame runs its own instance, so only this frame's document is
+    // listened to (adding the top document would handle keys twice).
+    [document].forEach((doc) => {
       const keydownHandler = (event) => this.handleKeydown(event);
       const keyupHandler = (event) => this.handleKeyup(event);
       doc.addEventListener('keydown', keydownHandler, true);

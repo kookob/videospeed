@@ -39,7 +39,7 @@
         <div class="row">
           <label for="audioBoolean"
             >Audio support<br />
-            <em>Show speed controls on audio elements.</em></label
+            <em>Let keyboard shortcuts control audio-only media (no toolbar is shown).</em></label
           >
           <input id="audioBoolean" type="checkbox" />
         </div>
@@ -73,7 +73,10 @@
         <div class="row">
           <label for="controllerOpacity"
             >Controller opacity<br />
-            <em>0 = fully transparent, 1 = fully opaque. Default: 0.3</em>
+            <em
+              >Opacity of the toolbar when idle; it turns fully opaque on hover. 0 = fully
+              transparent, 1 = fully opaque. Default: 0.3</em
+            >
           </label>
           <input id="controllerOpacity" type="text" value="" />
         </div>
@@ -122,8 +125,10 @@
           <label for="controllerCSS"
             >Custom CSS<br />
             <em
-              >Additional rules injected alongside the built-in defaults. Use to override
-              positioning or add site-specific tweaks.</em
+              >Extra rules applied to every page. The toolbar's contents are in a shadow root, so
+              style the <code>vsc-controller</code> element itself (e.g. <code>filter</code>,
+              <code>opacity</code>, <code>display</code>). Position can't be set here &mdash; drag
+              the speed badge instead.</em
             >
           </label>
           <div class="css-editor">
@@ -132,13 +137,8 @@
               id="controllerCSS"
               rows="8"
               spellcheck="false"
-              placeholder="/* Global override */
-vsc-controller { top: 50px !important; }
-
-/* Domain-specific */
-:root[style*='--vsc-domain: &quot;example.com&quot;'] vsc-controller {
-  display: none !important;
-}"
+              placeholder="/* Light toolbar instead of dark */
+vsc-controller { filter: invert(1); }"
             ></textarea>
           </div>
           <div id="cssValidation" class="css-validation"></div>
@@ -160,7 +160,7 @@ vsc-controller { top: 50px !important; }
             <li><a href="#faq-site-speed">Default speed per site</a></li>
             <li><a href="#faq-remember">Remember speed</a></li>
             <li><a href="#faq-keys">Shortcut conflicts</a></li>
-            <li><a href="#faq-position">Controller positioning</a></li>
+            <li><a href="#faq-position">Moving the controller</a></li>
             <li><a href="#faq-missing">Controller not showing</a></li>
             <li><a href="#faq-spa">Speed resets on navigate</a></li>
             <li><a href="#faq-audio">Audio support</a></li>
@@ -234,18 +234,11 @@ vsc-controller { top: 50px !important; }
             The controller overlaps with site controls. How do I reposition it?
           </h4>
           <p>
-            Go to <strong>Advanced &gt; Controller CSS</strong>. Add a domain rule targeting
-            <code>vsc-controller</code> using the <code>--vsc-domain</code> CSS variable. Example:
-          </p>
-          <p>
-            <code
-              >:root[style*='--vsc-domain: "example.com"'] vsc-controller { position: relative; top:
-              60px; }</code
-            >
-          </p>
-          <p>
-            You can also drag the controller to a new position on any page. See the existing rules
-            for YouTube, Netflix, etc. as reference.
+            Drag the speed badge to move the toolbar anywhere in the window; the position is kept
+            for the rest of the tab session. Custom CSS can't move it, but can restyle the
+            <code>vsc-controller</code> element (e.g. <code>filter</code>, <code>opacity</code>) in
+            <strong>Advanced &gt; Custom CSS</strong>. Use <strong>Controller button size</strong>
+            to make it larger or smaller.
           </p>
 
           <h4 id="faq-missing">The controller is not appearing on a site. Why?</h4>
@@ -258,6 +251,10 @@ vsc-controller { top: 50px !important; }
             <li>
               The site uses Flash or a non-HTML5 player &mdash; the extension only works with native
               <code>&lt;video&gt;</code> and <code>&lt;audio&gt;</code> elements.
+            </li>
+            <li>
+              Nothing has played yet, or the media is audio-only &mdash; the toolbar appears once a
+              video starts playing and is never shown for audio.
             </li>
             <li>
               <code>Hide controller by default</code> is enabled &mdash; press your display toggle
@@ -275,9 +272,9 @@ vsc-controller { top: 50px !important; }
 
           <h4 id="faq-audio">Does this work with audio elements, not just video?</h4>
           <p>
-            Yes. When <code>Audio support</code> is enabled in Preferences (on by default), the
-            controller appears on <code>&lt;audio&gt;</code> elements too. All speed controls and
-            keyboard shortcuts work identically for audio.
+            Yes, via keyboard shortcuts. When <code>Audio support</code> is enabled in Preferences
+            (on by default), shortcuts also control <code>&lt;audio&gt;</code> elements, but no
+            toolbar is shown for audio-only media.
           </p>
         </div>
         <div class="row">

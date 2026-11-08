@@ -39,8 +39,6 @@ export async function loadCoreModules() {
   await import('../../src/site-handlers/facebook-handler.js');
   await import('../../src/site-handlers/amazon-handler.js');
   await import('../../src/site-handlers/apple-handler.js');
-  await import('../../src/site-handlers/dailymotion-handler.js');
-  await import('../../src/site-handlers/frame-handler.js');
   await import('../../src/site-handlers/index.js');
 
   // Core controllers
@@ -51,7 +49,6 @@ export async function loadCoreModules() {
   await import('../../src/ui/controls.js');
   await import('../../src/ui/drag-handler.js');
   await import('../../src/ui/shadow-dom.js');
-  await import('../../src/ui/vsc-controller-element.js');
   await import('../../src/ui/floating-controller.js');
 
   // Observers

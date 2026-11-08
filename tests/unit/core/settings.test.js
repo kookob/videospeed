@@ -7,6 +7,7 @@ import {
   installChromeMock,
   cleanupChromeMock,
   resetMockStorage,
+  getMockStorage,
 } from '../../helpers/chrome-mock.js';
 import { vi } from 'vitest';
 
@@ -32,6 +33,29 @@ describe('Settings', () => {
     expect(config.settings.enabled).toBe(true);
     expect(config.settings.lastSpeed).toBe(1.0);
     expect(config.settings.logLevel).toBe(3);
+  });
+
+  it('migrates a legacy blacklist to disabled siteRules when none are stored', async () => {
+    const config = window.VSC.videoSpeedConfig;
+    await config.load();
+
+    expect(config.settings.siteRules).toEqual([
+      { pattern: 'www.instagram.com', enabled: false, speed: null },
+      { pattern: 'x.com', enabled: false, speed: null },
+    ]);
+    expect(getMockStorage().siteRules).toEqual(config.settings.siteRules);
+  });
+
+  it('flushPendingSave writes a debounced lastSpeed immediately', async () => {
+    const config = window.VSC.videoSpeedConfig;
+    await config.load();
+
+    await config.save({ lastSpeed: 2.5 });
+    expect(getMockStorage().lastSpeed).toBe(1.0);
+
+    await config.flushPendingSave();
+    expect(getMockStorage().lastSpeed).toBe(2.5);
+    expect(config.saveTimer).toBeNull();
   });
 
   it('VideoSpeedConfig should load settings from storage', async () => {

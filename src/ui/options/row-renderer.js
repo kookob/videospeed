@@ -16,11 +16,10 @@
  *   - type      {string}  'text' | 'checkbox' | 'select'
  *   - className {string}  CSS class for the element
  *   - placeholder {string}  (optional) Input placeholder
- *   - default   {*}       (optional) Default value if data[key] is missing
+ *   - default   {*}       (checkbox only, optional) Default if data[key] is missing
  *   - options   {Array}   (select only) Array of [value, label] pairs
  * @param {Object} [data={}] - Initial values keyed by column key
  * @param {Object} [opts={}] - Options:
- *   - before    {HTMLElement}  Insert before this element (default: append)
  *   - removable {boolean}      Add a remove button
  *   - id        {string}       Set row id attribute
  *   - className {string}       Additional CSS class(es) for the row
@@ -54,14 +53,13 @@ export function createRow(container, columns, data = {}, opts = {}) {
       el.className = col.className;
       el.checked = data[col.key] ?? col.default ?? false;
     } else {
-      // 'text' or any other input type
       el = document.createElement('input');
-      el.type = col.inputType || 'text';
+      el.type = 'text';
       el.className = col.className;
       if (col.placeholder) {
         el.placeholder = col.placeholder;
       }
-      const val = data[col.key] ?? col.default;
+      const val = data[col.key];
       if (val !== null && val !== undefined) {
         el.value = val;
       }
@@ -77,11 +75,7 @@ export function createRow(container, columns, data = {}, opts = {}) {
     row.appendChild(btn);
   }
 
-  if (opts.before) {
-    container.insertBefore(row, opts.before);
-  } else {
-    container.appendChild(row);
-  }
+  container.appendChild(row);
 
   return row;
 }

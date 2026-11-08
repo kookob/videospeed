@@ -3,7 +3,7 @@ window.addEventListener(
   (event) => {
     if (
       event.origin !== 'https://www.netflix.com' ||
-      event.data.action !== 'videospeed-seek' ||
+      event.data?.action !== 'videospeed-seek' ||
       !event.data.seekMs
     ) {
       return;

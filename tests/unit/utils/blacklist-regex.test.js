@@ -3,7 +3,7 @@
  * Tests regex patterns with and without flags
  */
 
-import { isBlacklisted } from '../../../src/utils/blacklist.js';
+import { isBlacklisted } from '../../../src/utils/site-pattern.js';
 
 describe('Blacklist Regex', () => {
   describe('should parse regex patterns WITHOUT flags', () => {

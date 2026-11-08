@@ -65,9 +65,12 @@ if (!window.VSC.VideoSpeedConfig) {
       try {
         // Use StorageManager which handles both contexts automatically.
         // controllerCSS: null fetches the legacy key for one-time migration (not in DEFAULT_SETTINGS).
+        // siteRules: null keeps "never saved" distinguishable from the defaults,
+        // otherwise the legacy blacklist → siteRules migration below never runs.
         const storage = await window.VSC.StorageManager.get({
           ...window.VSC.Constants.DEFAULT_SETTINGS,
           controllerCSS: null,
+          siteRules: null,
         });
 
         // null = bridge signaled abort (site disabled/blacklisted)
@@ -89,29 +92,21 @@ if (!window.VSC.VideoSpeedConfig) {
           await this.save({ keyBindings: this.settings.keyBindings });
         }
 
-        // Migrate legacy blacklist → siteRules (one-shot)
+        // Migrate legacy blacklist → siteRules (one-shot). Once both exist (the
+        // normal state for migrated users), blacklist is intentionally kept in
+        // storage for sync compat with older extension versions on other devices;
+        // the bridge only consults it while siteRules is absent.
+        // TODO: remove blacklist from storage once sync compat is no longer needed.
         if (storage.blacklist !== null && storage.blacklist !== undefined && !storage.siteRules) {
-          const regStrip = /^[\r\t\f\v ]+|[\r\t\f\v ]+$/gm;
           storage.siteRules = storage.blacklist
             .split('\n')
-            .map((l) => l.replace(regStrip, ''))
+            .map((l) => l.replace(window.VSC.Constants.regStrip, ''))
             .filter(Boolean)
             .map((pattern) => ({ pattern, enabled: false, speed: null }));
           await this.save({ siteRules: storage.siteRules });
           // Keep blacklist in storage for backward compat with older extension
           // versions that may be synced across devices. Harmless dead weight.
           window.VSC.logger.info('Migrated blacklist to siteRules');
-        } else if (
-          storage.blacklist !== null &&
-          storage.blacklist !== undefined &&
-          storage.siteRules
-        ) {
-          // Both exist — this is the normal state for all migrated users.
-          // blacklist is intentionally kept in storage for sync compat with older
-          // extension versions on other devices (see bridge fix: blacklist is only
-          // checked pre-migration when siteRules is absent).
-          // TODO: remove blacklist from storage once we're confident sync compat
-          // is no longer needed (a few release cycles after siteRules shipped).
         }
 
         // Apply siteRules
@@ -244,18 +239,7 @@ if (!window.VSC.VideoSpeedConfig) {
           clearTimeout(this.saveTimer);
         }
 
-        this.saveTimer = setTimeout(async () => {
-          const speedToSave = this.pendingSave;
-          this.pendingSave = null;
-          this.saveTimer = null;
-
-          try {
-            await window.VSC.StorageManager.set({ lastSpeed: speedToSave });
-            window.VSC.logger.info('Debounced speed setting saved successfully');
-          } catch (error) {
-            window.VSC.logger.error(`Failed to persist speed: ${error.message}`);
-          }
-        }, this.SAVE_DELAY);
+        this.saveTimer = setTimeout(() => this.flushPendingSave(), this.SAVE_DELAY);
 
         return true; // in-memory updated, persistence is deferred
       }
@@ -273,6 +257,28 @@ if (!window.VSC.VideoSpeedConfig) {
 
       window.VSC.logger.info('Settings saved successfully');
       return true;
+    }
+
+    /**
+     * Write a debounced lastSpeed now. Called by the timer, and on pagehide so
+     * a speed changed just before closing the tab is not lost.
+     * @returns {Promise<void>}
+     */
+    async flushPendingSave() {
+      if (!this.saveTimer) {
+        return;
+      }
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+      const speedToSave = this.pendingSave;
+      this.pendingSave = null;
+
+      try {
+        await window.VSC.StorageManager.set({ lastSpeed: speedToSave });
+        window.VSC.logger.info('Debounced speed setting saved successfully');
+      } catch (error) {
+        window.VSC.logger.error(`Failed to persist speed: ${error.message}`);
+      }
     }
 
     /**

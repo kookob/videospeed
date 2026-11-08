@@ -60,8 +60,6 @@ function createWorld() {
     A: new window.VSC.VideoController(media.A, containers.A, config, actionHandler),
     B: new window.VSC.VideoController(media.B, containers.B, config, actionHandler),
   };
-  const mediaVisible = { A: true };
-  vi.spyOn(controllers.A, 'isVideoVisible').mockImplementation(() => mediaVisible.A);
 
   let model = {
     A: V().createState({ mediaType: V().MEDIA_TYPES.VIDEO }),
@@ -91,7 +89,6 @@ function createWorld() {
     containers,
     media,
     controllers,
-    mediaVisible,
     get model() {
       return model;
     },
@@ -168,13 +165,15 @@ async function applyOperation(world, operation) {
       });
       break;
     case 'automatic':
+      // The automatic layer is written by startHidden at construction and by
+      // FloatingController.select(), which reveals unless startHidden is set.
       if (attached) {
-        if (id === 'A') {
-          world.mediaVisible.A = value;
-        } else {
-          world.config.settings.audioBoolean = value;
+        const host = world.controllers[id].div;
+        if (!value) {
+          host.classList.add('vsc-hidden');
+        } else if (!world.config.settings.startHidden) {
+          host.classList.remove('vsc-hidden');
         }
-        world.controllers[id].updateVisibility();
       }
       step(id, {
         type: value ? V().EVENTS.AUTOMATIC_SHOW : V().EVENTS.AUTOMATIC_HIDE,

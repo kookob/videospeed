@@ -45,7 +45,7 @@ MAIN-world modules are side-effect imports that register classes/singletons on `
 - **Speed arbitration** (`src/core/arbiter.js` pure decision core, `intent-classifier.js` heuristic gesture evidence, `speed-arbitration.js` DOM adapter) decides who owns `playbackRate` when user, site player, and VSC all write it (fight-back, adoption of native changes, per-media conflict records, authority epochs). Contract: `docs/speed-arbitration.md`; formal model: `specs/SpeedArbiter.tla`; differential tests in `tests/integration/*differential*`.
 - **Controller visibility** (`src/core/controller-visibility.js`) is a layered state machine (override AUTO/SHOW/HIDE, autohide, feedback timers, CSS precedence). Contract: `docs/controller-visibility.md`; model: `specs/ControllerVisibility.tla`.
 - **Floating controller** (`src/ui/floating-controller.js`) — one viewport-anchored toolbar per document following the last played video; embedded frames delegate UI to the top document; position persisted in `sessionStorage`.
-- **Site handlers** (`src/site-handlers/`) — per-site quirks (YouTube, Netflix, Facebook, Amazon, Apple, Dailymotion, iframes) extending `base-handler.js`, selected by `index.js`. See `docs/custom-player-handler.md`.
+- **Site handlers** (`src/site-handlers/`) — per-site quirks (seek APIs, ignored videos, gesture rules, special video discovery) for YouTube, Netflix, Facebook, Amazon, Apple, extending `base-handler.js`, selected by `index.js`. They no longer position the controller: every controller host is the floating toolbar mounted on `<html>`. See `docs/custom-player-handler.md`.
 - **Observers** (`src/observers/`) discover media via mutation observation and shadow-DOM traversal.
 
 ## Rules for changing behavior (from CONTRIBUTING.md)

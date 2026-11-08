@@ -5,7 +5,7 @@
 
 import { installChromeMock, cleanupChromeMock, resetMockStorage } from '../helpers/chrome-mock.js';
 import { createMockVideo, createMockDOM } from '../helpers/test-utils.js';
-import { isBlacklisted } from '../../src/utils/blacklist.js';
+import { isBlacklisted } from '../../src/utils/site-pattern.js';
 describe('BlacklistBlocking', () => {
   let mockDOM;
 

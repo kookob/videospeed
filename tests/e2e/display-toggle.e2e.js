@@ -44,30 +44,36 @@ function assertState(state, expected, context) {
 }
 
 async function waitForState(page, expected, context) {
-  await page.waitForFunction(
-    (target) => {
-      const host = document.querySelector('vsc-controller');
-      const controller = host?.shadowRoot?.querySelector('#controller');
-      if (!controller) {
-        return false;
-      }
-      const hostStyle = getComputedStyle(host);
-      const style = getComputedStyle(controller);
-      const current = {
-        mode: host.dataset.vscVisibility || 'auto',
-        automaticHidden: host.classList.contains('vsc-hidden'),
-        flashing: host.classList.contains('vsc-show'),
-        visible:
-          hostStyle.display !== 'none' &&
-          hostStyle.visibility !== 'hidden' &&
-          style.display !== 'none' &&
-          style.visibility !== 'hidden',
-      };
-      return Object.entries(target).every(([key, value]) => current[key] === value);
-    },
-    { timeout: 2000, polling: 50 },
-    expected
-  );
+  await page
+    .waitForFunction(
+      (target) => {
+        const host = document.querySelector('vsc-controller');
+        const controller = host?.shadowRoot?.querySelector('#controller');
+        if (!controller) {
+          return false;
+        }
+        const hostStyle = getComputedStyle(host);
+        const style = getComputedStyle(controller);
+        const current = {
+          mode: host.dataset.vscVisibility || 'auto',
+          automaticHidden: host.classList.contains('vsc-hidden'),
+          flashing: host.classList.contains('vsc-show'),
+          visible:
+            hostStyle.display !== 'none' &&
+            hostStyle.visibility !== 'hidden' &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden',
+        };
+        return Object.entries(target).every(([key, value]) => current[key] === value);
+      },
+      { timeout: 2000, polling: 50 },
+      expected
+    )
+    .catch(async () => {
+      throw new Error(
+        `${context}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(await getControllerState(page))}`
+      );
+    });
 
   assertState(await getControllerState(page), expected, context);
 }
@@ -108,6 +114,9 @@ async function assertCssVisibilityMatrix(page) {
     noTransitions.replaceSync('#controller { transition: none !important; }');
     host.shadowRoot.adoptedStyleSheets = [...host.shadowRoot.adoptedStyleSheets, noTransitions];
 
+    // Site autohide only reaches the toolbar when it is mounted inside the
+    // site's player (fullscreen). The class goes on <html>, the host's
+    // ancestor in page mode, so the shipped descendant selector is exercised.
     const modes = ['auto', 'show', 'hide'];
     const booleans = [false, true];
     const failures = [];
@@ -127,7 +136,7 @@ async function assertCssVisibilityMatrix(page) {
                 host.classList.toggle('vsc-hidden', automaticHidden);
                 host.classList.toggle('vsc-show', flash);
                 host.classList.toggle('vsc-nosource', noSource);
-                document.body.classList.toggle('ytp-autohide', siteAutohide);
+                document.documentElement.classList.toggle('ytp-autohide', siteAutohide);
                 host.style.display = hostHidden ? 'none' : '';
 
                 const hostStyle = getComputedStyle(host);
@@ -167,7 +176,7 @@ async function assertCssVisibilityMatrix(page) {
 
     delete host.dataset.vscVisibility;
     host.classList.remove('vsc-hidden', 'vsc-show', 'vsc-nosource');
-    document.body.classList.remove('ytp-autohide');
+    document.documentElement.classList.remove('ytp-autohide');
     host.style.display = '';
     host.shadowRoot.adoptedStyleSheets = host.shadowRoot.adoptedStyleSheets.filter(
       (sheet) => sheet !== noTransitions
@@ -209,37 +218,43 @@ async function getDualControllerStates(page) {
 }
 
 async function waitForDualControllerStates(page, expected, context) {
-  await page.waitForFunction(
-    (target) => {
-      const read = (id) => {
-        const media = document.getElementById(id);
-        const host = media?.vsc?.div;
-        const controller = host?.shadowRoot?.querySelector('#controller');
-        if (!host || !controller) {
-          return { attached: false };
-        }
-        const hostStyle = getComputedStyle(host);
-        const style = getComputedStyle(controller);
-        return {
-          attached: host.isConnected,
-          mode: host.dataset.vscVisibility || 'auto',
-          automaticHidden: host.classList.contains('vsc-hidden'),
-          visible:
-            hostStyle.display !== 'none' &&
-            hostStyle.visibility !== 'hidden' &&
-            style.display !== 'none' &&
-            style.visibility !== 'hidden',
+  await page
+    .waitForFunction(
+      (target) => {
+        const read = (id) => {
+          const media = document.getElementById(id);
+          const host = media?.vsc?.div;
+          const controller = host?.shadowRoot?.querySelector('#controller');
+          if (!host || !controller) {
+            return { attached: false };
+          }
+          const hostStyle = getComputedStyle(host);
+          const style = getComputedStyle(controller);
+          return {
+            attached: host.isConnected,
+            mode: host.dataset.vscVisibility || 'auto',
+            automaticHidden: host.classList.contains('vsc-hidden'),
+            visible:
+              hostStyle.display !== 'none' &&
+              hostStyle.visibility !== 'hidden' &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden',
+          };
         };
-      };
-      const fixtureIds = { video1: 'videoA', video2: 'videoB' };
-      return Object.entries(target).every(([id, fields]) => {
-        const current = read(fixtureIds[id]);
-        return Object.entries(fields).every(([key, value]) => current[key] === value);
-      });
-    },
-    { timeout: 2000, polling: 50 },
-    expected
-  );
+        const fixtureIds = { video1: 'videoA', video2: 'videoB' };
+        return Object.entries(target).every(([id, fields]) => {
+          const current = read(fixtureIds[id]);
+          return Object.entries(fields).every(([key, value]) => current[key] === value);
+        });
+      },
+      { timeout: 2000, polling: 50 },
+      expected
+    )
+    .catch(async () => {
+      throw new Error(
+        `${context}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(await getDualControllerStates(page))}`
+      );
+    });
 
   const actual = await getDualControllerStates(page);
   for (const [id, fields] of Object.entries(expected)) {
@@ -266,6 +281,12 @@ async function testDisplayToggle() {
     if (!found) {
       throw new Error('Controller never appeared');
     }
+    // The floating toolbar only exposes the most recently played video.
+    await page.evaluate(() => {
+      const video = document.querySelector('video');
+      video.muted = true;
+      return video.play();
+    });
 
     // The fixture is file://, so install the actual production defaults after
     // resolving their domain markers as YouTube. This keeps the matrix on the
@@ -300,7 +321,7 @@ async function testDisplayToggle() {
 
     // Regression for #1584: YouTube autohide must not retake control after
     // the visible AUTO -> HIDE -> SHOW sequence.
-    await page.evaluate(() => document.body.classList.add('ytp-autohide'));
+    await page.evaluate(() => document.documentElement.classList.add('ytp-autohide'));
     await waitForState(
       page,
       { mode: 'show', automaticHidden: false, visible: true },
@@ -350,14 +371,13 @@ async function testDisplayToggle() {
       'hide alternates to sticky show under autohide'
     );
 
-    // FORCE_SHOW also overrides the automatic class used by startHidden and
-    // media visibility; the automatic layer keeps updating underneath.
+    // FORCE_SHOW also overrides the automatic class written by startHidden
+    // and floating selection; the automatic layer keeps updating underneath.
     await page.evaluate(() => {
       const video = document.querySelector('video');
       delete video.vsc.div.dataset.vscVisibility;
-      document.body.classList.remove('ytp-autohide');
-      video.style.visibility = 'hidden';
-      video.vsc.updateVisibility();
+      document.documentElement.classList.remove('ytp-autohide');
+      video.vsc.div.classList.add('vsc-hidden');
     });
     await waitForState(
       page,
@@ -398,6 +418,9 @@ async function testDisplayToggle() {
       const first = document.getElementById('videoA').vsc.div;
       const second = document.getElementById('videoB').vsc.div;
       for (const host of [first, second]) {
+        // The floating coordinator masks every unselected host. Lift the mask
+        // so each controller's own visibility policy stays observable.
+        delete host.dataset.vscInactive;
         delete host.dataset.vscVisibility;
         host.classList.remove('vsc-hidden', 'vsc-show', 'vsc-nosource');
       }

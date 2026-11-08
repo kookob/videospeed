@@ -95,16 +95,23 @@ describe('StateManagerIntegration', () => {
     const mockVideo = createMockVideo();
     parent.appendChild(mockVideo);
 
-    new window.VSC.VideoController(mockVideo, parent, config, actionHandler);
+    const controller = new window.VSC.VideoController(mockVideo, parent, config, actionHandler);
     expect(window.VSC.stateManager.controllers.size).toBe(1);
 
     // Remove the parent div (which contains the video) from DOM
     // This simulates a site removing a video player
     parent.remove();
 
-    // getAllMediaElements should detect disconnected elements and clean up
-    const allMedia = window.VSC.stateManager.getAllMediaElements();
-    expect(allMedia.length).toBe(0);
+    // Detached media is skipped but stays registered until its controller is
+    // removed, so reinserting the same element keeps it controllable.
+    expect(window.VSC.stateManager.getAllMediaElements().length).toBe(0);
+    expect(window.VSC.stateManager.controllers.size).toBe(1);
+
+    document.body.appendChild(parent);
+    expect(window.VSC.stateManager.getAllMediaElements()).toEqual([mockVideo]);
+
+    controller.remove();
+    parent.remove();
     expect(window.VSC.stateManager.controllers.size).toBe(0);
   });
 

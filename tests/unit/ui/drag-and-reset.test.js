@@ -37,60 +37,57 @@ describe('DragAndReset', () => {
 
   // --- DragHandler tests ---
 
-  it('DragHandler.handleDrag uses pointer capture when pointerId is present', async () => {
+  it('DragHandler.handleDrag moves the floating toolbar with pointer capture', async () => {
     const config = window.VSC.videoSpeedConfig;
     await config.load();
     const eventManager = new window.VSC.EventManager(config, null);
     const actionHandler = new window.VSC.ActionHandler(config, eventManager);
+    const floating = new window.VSC.FloatingController(config, actionHandler);
+    window.VSC.floatingController = floating;
 
-    const mockVideo = createMockVideo();
-    mockDOM.container.appendChild(mockVideo);
-    const controller = new window.VSC.VideoController(mockVideo, null, config, actionHandler);
+    try {
+      const mockVideo = createMockVideo({ paused: false, readyState: 2 });
+      mockDOM.container.appendChild(mockVideo);
+      const controller = new window.VSC.VideoController(mockVideo, null, config, actionHandler);
+      floating.move(100, 100);
 
-    const shadowController = controller.div.shadowRoot.querySelector('#controller');
-    const draggable = controller.div.shadowRoot.querySelector('.draggable');
+      const shadowController = controller.div.shadowRoot.querySelector('#controller');
+      const draggable = controller.div.shadowRoot.querySelector('.draggable');
+      let captured = false;
+      draggable.setPointerCapture = () => {
+        captured = true;
+      };
 
-    let captured = false;
-    draggable.setPointerCapture = () => {
-      captured = true;
-    };
-    draggable.releasePointerCapture = () => {};
+      const pointer = (type, x, y) => {
+        const event = new Event(type);
+        event.clientX = x;
+        event.clientY = y;
+        event.pointerId = 1;
+        event.button = 0;
+        Object.defineProperty(event, 'target', { value: draggable });
+        return event;
+      };
 
-    // Simulate pointerdown with pointerId
-    const pointerEvent = new Event('pointerdown', { bubbles: true });
-    pointerEvent.clientX = 100;
-    pointerEvent.clientY = 100;
-    pointerEvent.pointerId = 1;
-    Object.defineProperty(pointerEvent, 'target', { value: draggable, writable: true });
+      window.VSC.DragHandler.handleDrag(mockVideo, pointer('pointerdown', 10, 10));
+      expect(captured).toBe(true);
+      expect(shadowController.classList.contains('dragging')).toBe(true);
 
-    window.VSC.DragHandler.handleDrag(mockVideo, pointerEvent);
+      draggable.dispatchEvent(pointer('pointermove', 30, 50));
+      expect(parseFloat(controller.div.style.left)).toBe(120);
+      expect(parseFloat(controller.div.style.top)).toBe(140);
 
-    expect(captured).toBe(true);
-    expect(shadowController.classList.contains('dragging')).toBe(true);
-  });
-
-  it('DragHandler.handleDrag falls back to mouse events without pointerId', async () => {
-    const config = window.VSC.videoSpeedConfig;
-    await config.load();
-    const eventManager = new window.VSC.EventManager(config, null);
-    const actionHandler = new window.VSC.ActionHandler(config, eventManager);
-
-    const mockVideo = createMockVideo();
-    mockDOM.container.appendChild(mockVideo);
-    const controller = new window.VSC.VideoController(mockVideo, null, config, actionHandler);
-
-    const shadowController = controller.div.shadowRoot.querySelector('#controller');
-    const draggable = controller.div.shadowRoot.querySelector('.draggable');
-
-    // Simulate mousedown without pointerId
-    const mouseEvent = new Event('mousedown', { bubbles: true });
-    mouseEvent.clientX = 50;
-    mouseEvent.clientY = 50;
-    Object.defineProperty(mouseEvent, 'target', { value: draggable, writable: true });
-
-    window.VSC.DragHandler.handleDrag(mockVideo, mouseEvent);
-
-    expect(shadowController.classList.contains('dragging')).toBe(true);
+      draggable.dispatchEvent(pointer('pointerup', 30, 50));
+      expect(shadowController.classList.contains('dragging')).toBe(false);
+      expect(JSON.parse(sessionStorage.getItem('vsc-floating-position'))).toEqual({
+        x: 120,
+        y: 140,
+      });
+      controller.remove();
+    } finally {
+      floating.destroy();
+      window.VSC.floatingController = null;
+      sessionStorage.clear();
+    }
   });
 
   // --- Double-click-to-reset tests ---

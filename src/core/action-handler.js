@@ -105,7 +105,7 @@ class ActionHandler {
 
       case 'blink':
         window.VSC.logger.debug('Showing controller momentarily');
-        this.flashController(video.vsc.div, value);
+        this.flashController(video.vsc.div, value, video.tagName === 'AUDIO');
         break;
 
       case 'drag':
@@ -142,21 +142,9 @@ class ActionHandler {
         break;
 
       case 'SET_SPEED':
-        window.VSC.logger.info('Setting speed to:', value);
+        window.VSC.logger.info(`Setting speed to: ${value}`);
         this.adjustSpeed(video, value, { authorityBatch: options.authorityBatch });
         break;
-
-      case 'ADJUST_SPEED':
-        window.VSC.logger.info('Adjusting speed by:', value);
-        this.adjustSpeed(video, value, { relative: true, authorityBatch: options.authorityBatch });
-        break;
-
-      case 'RESET_SPEED': {
-        window.VSC.logger.info('Resetting speed');
-        const preferredSpeed = this.config.getKeyBinding('fast') || 1.0;
-        this.adjustSpeed(video, preferredSpeed, { authorityBatch: options.authorityBatch });
-        break;
-      }
 
       default:
         window.VSC.logger.warn(`Unknown action: ${action}`);
@@ -356,11 +344,7 @@ class ActionHandler {
    * @param {HTMLMediaElement} video - Video element
    */
   jumpToMark(video) {
-    if (
-      video.vsc.mark === null ||
-      video.vsc.mark === undefined ||
-      typeof video.vsc.mark !== 'number'
-    ) {
+    if (typeof video.vsc.mark !== 'number') {
       return;
     }
 
@@ -385,8 +369,10 @@ class ActionHandler {
    * blinkController and EventManager.showController.
    * @param {HTMLElement} controller - Controller element
    * @param {number} duration - Duration in ms (default 2000)
+   * @param {boolean} [isAudio] - Callers holding the media pass this to skip
+   *   the controlled-media scan
    */
-  flashController(controller, duration) {
+  flashController(controller, duration, isAudio = this.isAudioController(controller)) {
     const visibility = window.VSC.ControllerVisibility;
     const override = visibility.normalizeOverride(controller.dataset.vscVisibility);
     if (
@@ -401,8 +387,6 @@ class ActionHandler {
       return;
     }
 
-    const isAudioController = this.isAudioController(controller);
-
     // Always clear any existing timer first (timer invariant: one per controller)
     if (controller.flashTimer !== undefined) {
       clearTimeout(controller.flashTimer);
@@ -415,7 +399,7 @@ class ActionHandler {
     window.VSC.logger.debug('Showing controller temporarily with vsc-show class');
 
     // For audio controllers, don't set timeout to hide again
-    if (!isAudioController) {
+    if (!isAudio) {
       controller.flashTimer = setTimeout(() => {
         controller.classList.remove('vsc-show');
         controller.flashTimer = undefined;
@@ -594,7 +578,7 @@ class ActionHandler {
     speedIndicator.textContent = numericSpeed.toFixed(2);
 
     if (video.vsc?.div) {
-      this.flashController(video.vsc.div);
+      this.flashController(video.vsc.div, undefined, video.tagName === 'AUDIO');
     }
   }
 }

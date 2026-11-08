@@ -10,8 +10,7 @@
  *   3. Bridge responds with VSC_SETTINGS_READY once its storage snapshot is ready
  */
 
-import { isBlacklisted } from '../utils/blacklist.js';
-import { matchSiteRule } from '../utils/site-pattern.js';
+import { isBlacklisted, matchSiteRule } from '../utils/site-pattern.js';
 
 // Speed limits for page→bridge write validation.
 // Duplicated from constants.js (ISOLATED world can't import page modules).

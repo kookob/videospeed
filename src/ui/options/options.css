@@ -539,23 +539,6 @@ button:active {
   font-size: 14px;
 }
 
-/* Button group layout (legacy — kept for status bar spacing) */
-.button-group {
-  display: none;
-  margin-top: 24px;
-  gap: 16px;
-}
-
-.primary-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-.secondary-buttons {
-  display: flex;
-  gap: 12px;
-}
-
 /* Status message — collapsed when empty, expands for errors */
 #status {
   display: none;
@@ -741,18 +724,12 @@ button:active {
   }
 }
 
-.css-editor textarea.css-error {
-  border-color: #d32f2f;
-}
 .css-editor textarea.css-warn {
   border-color: #f57c00;
 }
 
 .css-validation {
   font-size: 12px;
-}
-.css-validation.error {
-  color: #d32f2f;
 }
 .css-validation.warn {
   color: #f57c00;
@@ -857,28 +834,6 @@ button:active {
 
   .row.site-rule .ruleSpeed {
     width: 70px;
-  }
-
-  .button-group {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .primary-buttons {
-    width: 100%;
-  }
-
-  .primary-buttons button {
-    flex: 1;
-  }
-
-  .secondary-buttons {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .secondary-buttons button {
-    flex: 1;
   }
 }
 

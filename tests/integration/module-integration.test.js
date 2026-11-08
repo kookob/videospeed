@@ -42,12 +42,7 @@ describe('ModuleIntegration', () => {
 
     const handler = siteHandlerManager.getCurrentHandler();
     expect(handler).toBeDefined();
-
-    // Should return positioning info
-    const mockVideo = createMockVideo();
-    const positioning = siteHandlerManager.getControllerPosition(mockDOM.container, mockVideo);
-    expect(positioning).toBeDefined();
-    expect(positioning.insertionPoint).toBeDefined();
+    expect(siteHandlerManager.shouldIgnoreVideo(createMockVideo())).toBe(false);
   });
 
   it('Settings should integrate with ActionHandler', async () => {

@@ -9,7 +9,7 @@ The production policy is `src/core/controller-visibility.js`. Its machine-checke
 The contract covers:
 
 - one explicit override per controller: `AUTO`, `SHOW`, or `HIDE`;
-- automatic visibility from `startHidden`, media visibility, and audio-controller enablement;
+- automatic visibility from `startHidden` and page-level floating selection;
 - site-owned autohide such as YouTube's `.ytp-autohide`;
 - temporary video feedback and persistent audio feedback;
 - no-source and external host hiding;
@@ -53,6 +53,14 @@ external host hide / no source / FORCE_HIDE
 ```
 
 `SHOW` deliberately overrides `vsc-hidden` and site autohide, but it cannot resurrect a detached controller, make unusable media useful, or defeat unrelated page CSS that hides the light-DOM host. `HIDE` defeats a stale flash class. Opacity is excluded from the discrete visibility predicate because fades pass through zero; computed `display` and `visibility` on both host and shadow controller define the sampled state.
+
+## Floating toolbar adapter
+
+Every controller host is a page-level floating toolbar (`src/ui/floating-controller.js`), positioned with inline `!important` declarations outside the player. The adapter maps onto the model as follows:
+
+- **Automatic layer.** `vsc-hidden` is written by `startHidden` at construction and cleared by `FloatingController.select()` when a video starts playing, unless `startHidden` is set. Media geometry (offscreen, zero-size) no longer drives it: a playing video keeps its toolbar.
+- **Selection mask.** Only the most recently played video's host is exposed. Unselected hosts and every audio host carry `data-vsc-inactive`, a hard hide outside the model's state, like external host hiding. Audio keeps its keyboard shortcuts and its model state; it never renders a toolbar.
+- **Site autohide.** Page autohide classes live on the site's player, which is not an ancestor of the toolbar in page mode, so autohide does not hide it there. In fullscreen the host is mounted inside `document.fullscreenElement` (the player), where the YouTube rule applies as specified below.
 
 YouTube site autohide is implemented by domain-scoped light-DOM CSS on `<vsc-controller>`, not by copying page state into extension-owned DOM and not by the deprecated `:host-context()` selector. The host rule excludes explicit `SHOW` and `vsc-show` feedback before applying `visibility: hidden`; shadow selectors keep automatic hide, explicit `HIDE`, and no-source precedence. Changing either side requires the Chrome matrix test, not just a unit test.
 
@@ -108,7 +116,7 @@ The verification layers answer different questions:
 1. `npm run test:tlc` exhaustively checks the two-controller temporal model. The current configuration reaches 49,152 distinct states, generates 724,800 states, and checks three non-vacuous video-timer liveness branches.
 2. `tests/unit/core/controller-visibility.test.js` enumerates 448 valid local states and 6,720 state/event pairs against the pure JavaScript transition policy.
 3. `tests/integration/controller-visibility-differential.test.js` replays deterministic mixed traces through the pure model and real `ActionHandler` / `VideoController` adapters, including local and broadcast actions, video and audio feedback, environment changes, live settings, expiry, and release.
-4. `tests/e2e/display-toggle.e2e.js` checks the real document-and-shadow cascade across `3 overrides × 2 automaticHidden × 2 siteAutohide × 2 flash × 2 noSource × 2 hostHidden = 96` render combinations, then verifies mixed two-controller local, broadcast, flash-sampling, and release behavior in Chrome.
+4. `tests/e2e/display-toggle.e2e.js` checks the real document-and-shadow cascade across `3 overrides × 2 automaticHidden × 2 siteAutohide × 2 flash × 2 noSource × 2 hostHidden = 96` render combinations, then verifies mixed two-controller local, broadcast, flash-sampling, and release behavior in Chrome. The matrix places the autohide class on `<html>` (an ancestor of the host) to exercise the shipped descendant selector, and the two-controller section lifts the selection mask so each host's own policy is observable.
 
 A green TLA+ run cannot prove that CSS source order is correct, and a green browser matrix cannot prove timer liveness or non-interference across all action sequences. Both are required for changes to this contract.
 
