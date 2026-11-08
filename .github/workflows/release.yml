@@ -1,0 +1,61 @@
+name: Release
+
+# Pushing a version tag (v1.2.3) builds the extension and publishes a GitHub
+# release with the installable zip. The tag must match package.json.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release zip
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Check tag matches package.json version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $VERSION"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build:release
+      - run: node scripts/package-release.js
+
+      - name: Prepare release notes
+        run: |
+          NOTES="docs/release-$VERSION.md"
+          if [ -f "$NOTES" ]; then
+            node --input-type=module -e "
+              import fs from 'node:fs';
+              import { prepareReleaseNotes } from './scripts/github-release.js';
+              fs.writeFileSync('release-notes.md', prepareReleaseNotes(fs.readFileSync('$NOTES', 'utf8')));
+            "
+            echo "NOTES_ARGS=--notes-file release-notes.md" >> "$GITHUB_ENV"
+          else
+            echo "NOTES_ARGS=--generate-notes" >> "$GITHUB_ENV"
+          fi
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # NOTES_ARGS is intentionally unquoted: it holds a flag plus its value.
+        run: |
+          gh release create "$GITHUB_REF_NAME" "release/videospeed-$VERSION.zip" \
+            --title "$GITHUB_REF_NAME" --verify-tag $NOTES_ARGS
