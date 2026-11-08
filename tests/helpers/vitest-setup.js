@@ -5,7 +5,7 @@
  * and pre-loads all extension modules once for the entire test run.
  */
 
-import { beforeAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { installChromeMock, resetMockStorage } from './chrome-mock.js';
 import { loadInjectModules } from './module-loader.js';
 
@@ -76,6 +76,17 @@ if (!HTMLElement.prototype._originalAttachShadow) {
 // Individual test files no longer need to call loadCoreModules/loadInjectModules.
 beforeAll(async () => {
   await loadInjectModules();
+});
+
+// Loading inject.js starts the extension's idle-deferred startup chain. Tear it
+// down so callbacks still queued when a short test file ends return early
+// instead of running after jsdom is gone (`window is not defined`).
+afterAll(() => {
+  try {
+    window.VSC_controller?.teardown();
+  } catch {
+    // Best effort: a test may have replaced the modules teardown relies on.
+  }
 });
 
 // Reset mock storage between tests for isolation
