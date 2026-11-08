@@ -44,6 +44,7 @@ import '../ui/controls.js';
 import '../ui/drag-handler.js';
 import '../ui/shadow-dom.js';
 import '../ui/vsc-controller-element.js';
+import '../ui/floating-controller.js';
 
 // Site-specific handlers - depends on core
 import '../site-handlers/base-handler.js';

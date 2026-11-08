@@ -40,12 +40,31 @@ we don't read at a fixed pace, and we shouldn't watch at one either.
   and tabs.
 - **Speed fightback** - automatically re-applies your chosen speed when a
   site's player tries to reset it.
-- **Draggable overlay** - reposition the on-video speed indicator anywhere
-  you like.
+- **Page-level floating controls** - one toolbar follows the most recently
+  played video, outside the player's click-to-pause area. Drag it
+  anywhere in the viewport; its position survives refreshes in the same tab.
 - **Fully customizable shortcuts** - remap every key, add modifier combos
   (Ctrl, Shift, Alt), create multiple preferred-speed toggles.
 - **Custom controller CSS** - style or reposition the overlay with your own
   CSS rules.
+
+## Floating toolbar
+
+The toolbar appears when a video starts playing and keeps that target when paused.
+Audio-only pages and pages without video do not display a toolbar; audio speed
+shortcuts remain available. The toolbar hides when the selected video ends, is
+emptied, or is removed (unless another video is playing).
+Idle videos do not each show their own controls. The toolbar stays fixed while
+scrolling and shows only the speed badge; hovering or focusing it reveals the
+buttons beside it (toward the side with more room) without moving the badge.
+Drag the speed badge to move it, or focus it and use the arrow keys. Double-click
+or press Enter on the badge to reset speed. Positions are remembered per site
+for the current tab (when session storage is available).
+
+Embedded players delegate controls to the top page when the extension is active
+there, with a local fallback otherwise. Fullscreen containers use local controls.
+Native video-only fullscreen can restrict custom overlays. Page-level floating
+positioning replaces the legacy site-specific player offsets.
 
 ## Default keyboard shortcuts
 

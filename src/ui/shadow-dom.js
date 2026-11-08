@@ -133,6 +133,58 @@ class ShadowDOMManager {
         color: #ffffff;
       }
       
+      /* Floating controls collapse to the speed badge. Buttons overlay on
+         hover/focus beside it, so expanding never moves the badge. */
+      :host([data-vsc-floating]) #controller {
+        position: relative;
+        margin: 0;
+        padding: 6px;
+        box-shadow: 0 4px 16px #0005;
+        opacity: 0.9 !important;
+        max-width: calc(100vw - 12px);
+        box-sizing: border-box;
+      }
+      :host([data-vsc-floating]) #controls {
+        display: none;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 100%;
+        align-items: center;
+        padding: 0 6px 0 0;
+        background: black;
+        border-radius: 6px;
+      }
+      :host([data-vsc-floating][data-vsc-expand="left"]) #controls {
+        left: auto;
+        right: 100%;
+        padding: 0 0 0 6px;
+      }
+      :host([data-vsc-floating]:hover) #controls,
+      :host([data-vsc-floating]) #controller:focus-within #controls,
+      :host([data-vsc-floating]) #controller.dragging #controls {
+        display: flex;
+      }
+      :host([data-vsc-floating]) button {
+        min-width: 32px;
+        min-height: 32px;
+        touch-action: manipulation;
+      }
+      :host([data-vsc-floating]) .draggable,
+      :host([data-vsc-floating]) #controller:hover > .draggable {
+        min-height: 32px;
+        margin-right: 0;
+      }
+      button:focus-visible {
+        outline: 2px solid #60baff;
+        outline-offset: 2px;
+      }
+      /* Inactive media must stay hidden even during shortcut feedback. */
+      :host([data-vsc-inactive]) #controller {
+        display: none !important;
+        visibility: hidden !important;
+      }
+
       button:active {
         background: #2196f3;
         color: #ffffff;
@@ -154,6 +206,7 @@ class ShadowDOMManager {
     const draggable = document.createElement('span');
     draggable.setAttribute('data-action', 'drag');
     draggable.className = 'draggable';
+    draggable.title = 'Drag to move; double-click to reset speed';
     draggable.style.cssText = `font-size: ${buttonSize}px;`;
     draggable.textContent = speed;
     controller.appendChild(draggable);
@@ -173,6 +226,15 @@ class ShadowDOMManager {
 
     buttons.forEach((btnConfig) => {
       const button = document.createElement('button');
+      button.type = 'button';
+      const labels = {
+        rewind: 'Rewind',
+        slower: 'Decrease speed',
+        faster: 'Increase speed',
+        advance: 'Fast forward',
+      };
+      button.setAttribute('aria-label', labels[btnConfig.action]);
+      button.title = labels[btnConfig.action];
       button.setAttribute('data-action', btnConfig.action);
       if (btnConfig.class) {
         button.className = btnConfig.class;

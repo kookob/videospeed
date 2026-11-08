@@ -190,6 +190,10 @@ class VideoSpeedExtension {
       this.eventManager = new this.EventManager(this.config, null);
       this.actionHandler = new this.ActionHandler(this.config, this.eventManager);
       this.eventManager.actionHandler = this.actionHandler;
+      window.VSC.floatingController = new window.VSC.FloatingController(
+        this.config,
+        this.actionHandler
+      );
 
       this.setupObservers();
 
@@ -416,6 +420,9 @@ class VideoSpeedExtension {
         video.vsc.remove();
       }
     }
+
+    window.VSC.floatingController?.destroy();
+    window.VSC.floatingController = null;
 
     // Stop observing DOM for new videos
     if (this.mutationObserver) {

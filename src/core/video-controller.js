@@ -48,6 +48,7 @@ class VideoController {
 
     // Create UI
     this.div = this.initializeControls();
+    window.VSC.floatingController?.register(this);
 
     // Set up event handlers
     this.setupEventHandlers();
@@ -173,6 +174,12 @@ class VideoController {
     // Store speed indicator reference
     this.speedIndicator = window.VSC.ShadowDOMManager.getSpeedIndicator(shadow);
 
+    // Floating mode is mounted outside the player's click/capture hierarchy.
+    if (window.VSC.floatingController) {
+      document.documentElement.appendChild(wrapper);
+      return wrapper;
+    }
+
     // Insert into DOM FIRST — position calculation needs the wrapper in the DOM
     this.insertIntoDOM(document, wrapper);
 
@@ -240,7 +247,21 @@ class VideoController {
 
     // Bind event handlers. Seek evidence is recorded before the readyState
     // restore guard so initialization-time seeks can explain a 1.0 reset.
-    this.handlePlay = mediaEventAction.bind(this);
+    this.handlePlay = (event) => {
+      mediaEventAction(event);
+      window.VSC.floatingController?.select(this);
+    };
+    this.handleFloatingRate = () => {
+      if (window.VSC.floatingController?.active === this) {
+        window.VSC.floatingController.publish(true);
+      }
+    };
+    this.video.addEventListener('ratechange', this.handleFloatingRate);
+    this.handleFloatingStop = () => {
+      window.VSC.floatingController?.deactivate(this);
+    };
+    this.video.addEventListener('ended', this.handleFloatingStop);
+    this.video.addEventListener('emptied', this.handleFloatingStop);
     this.handleSeekEvidence = (event) => {
       this.arbitration.classifier?.observeSeek(this.video, event.timeStamp);
     };
@@ -286,6 +307,9 @@ class VideoController {
           } else {
             controller.classList.remove('vsc-nosource');
           }
+          if (window.VSC.floatingController?.active === this) {
+            window.VSC.floatingController.publish(true);
+          }
         }
       });
     });
@@ -306,6 +330,17 @@ class VideoController {
     if (this.div?.flashTimer !== undefined) {
       clearTimeout(this.div.flashTimer);
       this.div.flashTimer = undefined;
+    }
+
+    window.VSC.floatingController?.unregister(this);
+    if (this.handleFloatingRate) {
+      this.video.removeEventListener('ratechange', this.handleFloatingRate);
+      this.handleFloatingRate = null;
+    }
+    if (this.handleFloatingStop) {
+      this.video.removeEventListener('ended', this.handleFloatingStop);
+      this.video.removeEventListener('emptied', this.handleFloatingStop);
+      this.handleFloatingStop = null;
     }
 
     // Remove DOM element
@@ -406,6 +441,11 @@ class VideoController {
    * Called when video visibility changes
    */
   updateVisibility() {
+    // An offscreen/hidden video can still be playing. The floating toolbar is
+    // independent of player geometry; retain explicit/default hide settings.
+    if (window.VSC.floatingController) {
+      return;
+    }
     const isVisible = this.isVideoVisible();
     const isCurrentlyHidden = this.div.classList.contains('vsc-hidden');
 
