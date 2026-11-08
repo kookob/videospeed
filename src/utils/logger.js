@@ -32,14 +32,6 @@ if (!window.VSC.logger) {
     }
 
     /**
-     * Set default logging level
-     * @param {number} level - Default level from LOG_LEVELS constants
-     */
-    setDefaultLevel(level) {
-      this.defaultLevel = level;
-    }
-
-    /**
      * Generate video/controller context string from context stack
      * @returns {string} Context string like "[V1]" or ""
      * @private

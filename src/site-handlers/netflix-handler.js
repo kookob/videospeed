@@ -14,21 +14,6 @@ class NetflixHandler extends window.VSC.BaseSiteHandler {
   }
 
   /**
-   * Get Netflix-specific controller positioning
-   * @param {HTMLElement} parent - Parent element
-   * @param {HTMLElement} video - Video element
-   * @returns {Object} Positioning information
-   */
-  getControllerPosition(parent, _video) {
-    // Insert before parent to bypass Netflix's overlay
-    return {
-      insertionPoint: parent.parentElement,
-      insertionMethod: 'beforeParent',
-      targetParent: parent.parentElement,
-    };
-  }
-
-  /**
    * Handle Netflix-specific seeking using their API
    * @param {HTMLMediaElement} video - Video element
    * @param {number} seekSeconds - Seconds to seek
@@ -80,14 +65,6 @@ class NetflixHandler extends window.VSC.BaseSiteHandler {
       video.classList.contains('preview-video') ||
       video.parentElement?.classList.contains('billboard-row')
     );
-  }
-
-  /**
-   * Get Netflix-specific video container selectors
-   * @returns {Array<string>} CSS selectors
-   */
-  getVideoContainerSelectors() {
-    return ['.watch-video', '.nfp-container', '#netflix-player'];
   }
 }
 

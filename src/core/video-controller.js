@@ -13,7 +13,6 @@ class VideoController {
     }
 
     this.video = target;
-    this.parent = target.parentElement || parent;
     this.config = config;
     this.actionHandler = actionHandler;
     // Lifecycle decisions come from the document coordinator, which shares
@@ -133,7 +132,10 @@ class VideoController {
 
     window.VSC.logger.debug(`Speed variable set to: ${speed}`);
 
-    // Create custom element wrapper to avoid CSS conflicts
+    // Custom element wrapper to avoid CSS conflicts. Deliberately left
+    // unregistered (no customElements.define): custom-elements-es5-adapter
+    // polyfills break native class constructors (#1458), and hyphenated tags
+    // work for CSS, querySelector and shadow DOM without registration.
     const wrapper = document.createElement('vsc-controller');
 
     // Apply all CSS classes at once to prevent race condition flash
@@ -154,15 +156,7 @@ class VideoController {
     // Apply all classes at once to prevent visible flash
     wrapper.className = cssClasses.join(' ');
 
-    // IMPORTANT: Wrapper gets z-index ONLY — no position, no top, no left.
-    // Position is controlled by inject.css (default: absolute; site overrides: relative).
-    // Adding inline position here would defeat CSS site overrides via specificity.
-    wrapper.style.cssText = 'z-index: 9999999 !important;';
-
-    // Create shadow DOM with placeholder position (set after insertion)
     const shadow = window.VSC.ShadowDOMManager.createShadowDOM(wrapper, {
-      top: '0px',
-      left: '0px',
       speed: speed,
       opacity: this.config.settings.controllerOpacity,
       buttonSize: this.config.settings.controllerButtonSize,
@@ -174,66 +168,12 @@ class VideoController {
     // Store speed indicator reference
     this.speedIndicator = window.VSC.ShadowDOMManager.getSpeedIndicator(shadow);
 
-    // Floating mode is mounted outside the player's click/capture hierarchy.
-    if (window.VSC.floatingController) {
-      document.documentElement.appendChild(wrapper);
-      return wrapper;
-    }
-
-    // Insert into DOM FIRST — position calculation needs the wrapper in the DOM
-    this.insertIntoDOM(document, wrapper);
-
-    // THEN compute position based on actual DOM state.
-    // If a CSS override sets the wrapper to position:relative (e.g. YouTube, Netflix),
-    // the inner controller stays at (0,0) and the CSS nudge handles placement.
-    // Otherwise (wrapper is absolute), compute coordinates for generic sites.
-    const computedPosition = getComputedStyle(wrapper).position;
-    if (computedPosition !== 'relative') {
-      const position = window.VSC.ShadowDOMManager.calculatePosition(this.video);
-      const innerController = window.VSC.ShadowDOMManager.getController(shadow);
-      innerController.style.top = position.top;
-      innerController.style.left = position.left;
-    }
+    // The page-level floating toolbar positions this host; mounting it on
+    // <html> keeps it outside the player's click/capture hierarchy.
+    document.documentElement.appendChild(wrapper);
 
     window.VSC.logger.debug('initializeControls End');
     return wrapper;
-  }
-
-  /**
-   * Insert controller into DOM with site-specific positioning
-   * @param {Document} document - Document object
-   * @param {HTMLElement} wrapper - Wrapper element to insert
-   * @private
-   */
-  insertIntoDOM(document, wrapper) {
-    const fragment = document.createDocumentFragment();
-    fragment.appendChild(wrapper);
-
-    // Get site-specific positioning information
-    const positioning = window.VSC.siteHandlerManager.getControllerPosition(
-      this.parent,
-      this.video
-    );
-
-    switch (positioning.insertionMethod) {
-      case 'beforeParent':
-        positioning.insertionPoint.parentElement.insertBefore(fragment, positioning.insertionPoint);
-        break;
-
-      case 'afterParent':
-        positioning.insertionPoint.parentElement.insertBefore(
-          fragment,
-          positioning.insertionPoint.nextSibling
-        );
-        break;
-
-      case 'firstChild':
-      default:
-        positioning.insertionPoint.insertBefore(fragment, positioning.insertionPoint.firstChild);
-        break;
-    }
-
-    window.VSC.logger.debug(`Controller inserted using ${positioning.insertionMethod} method`);
   }
 
   /**
@@ -296,10 +236,8 @@ class VideoController {
   setupMutationObserver() {
     this.targetObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
-        if (
-          mutation.type === 'attributes' &&
-          (mutation.attributeName === 'src' || mutation.attributeName === 'currentSrc')
-        ) {
+        // currentSrc is an IDL property, never an attribute mutation.
+        if (mutation.attributeName === 'src') {
           window.VSC.logger.debug('Mutation of A/V element detected');
           const controller = this.div;
           if (!mutation.target.src && !mutation.target.currentSrc) {
@@ -315,7 +253,7 @@ class VideoController {
     });
 
     this.targetObserver.observe(this.video, {
-      attributeFilter: ['src', 'currentSrc'],
+      attributeFilter: ['src'],
     });
   }
 
@@ -382,7 +320,7 @@ class VideoController {
 
     // Release per-media conflict/timer/echo state before detaching the
     // controller reference that EventManager uses to identify controlled media.
-    this.actionHandler?.eventManager?.arbitration?.release(this.video);
+    this.arbitration.release(this.video);
 
     // Remove reference from video element
     delete this.video.vsc;
@@ -409,74 +347,6 @@ class VideoController {
 
     const random = Math.floor(Math.random() * 1000);
     return `${tagName}-${Math.abs(srcHash)}-${timestamp}-${random}`;
-  }
-
-  /**
-   * Check if the video element is currently visible
-   * @returns {boolean} True if video is visible
-   */
-  isVideoVisible() {
-    // Check if video is still connected to DOM
-    if (!this.video.isConnected) {
-      return false;
-    }
-
-    // Check computed style for visibility
-    const style = window.getComputedStyle(this.video);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-      return false;
-    }
-
-    // Check if video has reasonable dimensions
-    const rect = this.video.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Update controller visibility based on video visibility
-   * Called when video visibility changes
-   */
-  updateVisibility() {
-    // An offscreen/hidden video can still be playing. The floating toolbar is
-    // independent of player geometry; retain explicit/default hide settings.
-    if (window.VSC.floatingController) {
-      return;
-    }
-    const isVisible = this.isVideoVisible();
-    const isCurrentlyHidden = this.div.classList.contains('vsc-hidden');
-
-    // Special handling for audio elements - don't hide controllers for functional audio
-    if (this.video.tagName === 'AUDIO') {
-      // Preserve startHidden; otherwise audio support controls automatic visibility.
-      if (!this.config.settings.audioBoolean && !isCurrentlyHidden) {
-        this.div.classList.add('vsc-hidden');
-        window.VSC.logger.debug('Hiding audio controller - audio support disabled');
-      } else if (
-        this.config.settings.audioBoolean &&
-        isCurrentlyHidden &&
-        !this.config.settings.startHidden
-      ) {
-        // Keep the automatic layer current beneath any explicit override.
-        this.div.classList.remove('vsc-hidden');
-        window.VSC.logger.debug('Showing audio controller - audio support enabled');
-      }
-      return;
-    }
-
-    // Original logic for video elements
-    if (isVisible && isCurrentlyHidden && !this.config.settings.startHidden) {
-      // Keep automatic visibility current beneath any explicit override.
-      this.div.classList.remove('vsc-hidden');
-      window.VSC.logger.debug('Showing controller - video became visible');
-    } else if (!isVisible && !isCurrentlyHidden) {
-      // Video became invisible and controller is visible
-      this.div.classList.add('vsc-hidden');
-      window.VSC.logger.debug('Hiding controller - video became invisible');
-    }
   }
 }
 

@@ -146,14 +146,6 @@ describe('page floating controller', () => {
     expect(pause).not.toHaveBeenCalled();
   });
 
-  it('keeps the active control usable when the video scrolls out of view', () => {
-    const controller = add();
-    play(controller);
-    vi.spyOn(controller, 'isVideoVisible').mockReturnValue(false);
-    controller.updateVisibility();
-    expect(controller.div.classList.contains('vsc-hidden')).toBe(false);
-  });
-
   it('clamps movement and restores position in a new coordinator', () => {
     const controller = add();
     play(controller);
@@ -257,7 +249,10 @@ describe('page floating controller', () => {
       },
     });
     const host = manager.host;
+    const source = frame.contentWindow;
     frame.remove();
+    // Browsers report a detached frame's window as closed; jsdom does not.
+    Object.defineProperty(source, 'closed', { configurable: true, value: true });
     await Promise.resolve();
     expect(manager.remote).toBeNull();
     expect(host.isConnected).toBe(false);

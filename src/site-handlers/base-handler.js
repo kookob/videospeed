@@ -18,20 +18,6 @@ class BaseSiteHandler {
   }
 
   /**
-   * Get the site-specific positioning for the controller
-   * @param {HTMLElement} parent - Parent element
-   * @param {HTMLElement} video - Video element
-   * @returns {Object} Positioning information
-   */
-  getControllerPosition(parent, _video) {
-    return {
-      insertionPoint: parent,
-      insertionMethod: 'firstChild', // 'firstChild', 'beforeParent', 'afterParent'
-      targetParent: parent,
-    };
-  }
-
-  /**
    * Declare site-specific intent-classifier rule activations.
    *
    * The classifier owns what each flag MEANS (signature rates, binding,
@@ -111,14 +97,6 @@ class BaseSiteHandler {
    */
   resolveGestureMedia(_event, _mediaElements) {
     return null;
-  }
-
-  /**
-   * Get site-specific CSS selectors for video containers
-   * @returns {Array<string>} CSS selectors
-   */
-  getVideoContainerSelectors() {
-    return [];
   }
 
   /**

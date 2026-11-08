@@ -45,11 +45,15 @@ class FloatingController {
     };
     window.addEventListener('pagehide', this.onPageHide);
     window.addEventListener('pageshow', this.onPageShow);
-    this.stateObserver = new MutationObserver(() => this.publish(true));
+    // Re-layout on show/hide (a hidden toolbar measures 0x0) and mirror the
+    // state to the top document when running in a frame.
+    this.stateObserver = new MutationObserver(() => {
+      this.layout();
+      this.publish(true);
+    });
   }
 
   register(controller) {
-    controller.div.dataset.vscFloating = '';
     controller.div.dataset.vscInactive = '';
     this.styleHost(controller.div);
     // Mark audio inactive before returning: its underlying media controller
@@ -109,8 +113,8 @@ class FloatingController {
   }
 
   styleHost(host) {
-    // Inline important declarations deliberately bypass the legacy per-site
-    // player offsets. The host occupies just the toolbar, never a page overlay.
+    // Inline important declarations keep site and user CSS from repositioning
+    // the host. The host occupies just the toolbar, never a page overlay.
     for (const [key, value] of Object.entries({
       position: 'fixed',
       top: '0px',
@@ -158,7 +162,8 @@ class FloatingController {
     }
     const inner = host.shadowRoot.querySelector('#controller');
     const rect = inner.getBoundingClientRect();
-    const width = rect.width || 210;
+    // Hidden toolbars measure 0x0; fall back to the collapsed badge size.
+    const width = rect.width || 52;
     const height = rect.height || 44;
     // client* excludes page scrollbars; inner* includes them (fallback for jsdom).
     const vw = document.documentElement.clientWidth || window.innerWidth;
@@ -171,8 +176,6 @@ class FloatingController {
     host.style.setProperty('top', `${y}px`, 'important');
     // Expand hover buttons toward the roomier side so they stay on screen.
     host.dataset.vscExpand = x + width / 2 > vw / 2 ? 'left' : 'right';
-    inner.style.left = '0px';
-    inner.style.top = '0px';
   }
 
   move(x, y, save = false) {
@@ -251,8 +254,9 @@ class FloatingController {
     if (!message.available) {
       if (this.remote?.source === event.source) {
         this.clearRemote();
-        if (this.active) {
-          this.active.div.dataset.vscInactive = '';
+        // Mirror deactivate(): fall back to a local video that is still playing.
+        if (this.active && !this.active.video.paused && !this.active.video.ended) {
+          this.mount();
         }
       }
       return;
@@ -303,7 +307,6 @@ class FloatingController {
   createRemote(source) {
     this.clearRemote();
     const host = document.createElement('vsc-controller');
-    host.dataset.vscFloating = '';
     this.styleHost(host);
     const shadow = window.VSC.ShadowDOMManager.createShadowDOM(host, {
       opacity: this.config.settings.controllerOpacity,
@@ -334,8 +337,10 @@ class FloatingController {
       this.config
     ).setupControlEvents(shadow, video);
     this.remote = { source, host };
+    // Runs after every DOM mutation batch, so avoid the full frame-tree walk:
+    // a removed frame's window reports closed (readable cross-origin).
     this.frameObserver = new MutationObserver(() => {
-      if (this.remote && !this.isChildFrame(this.remote.source)) {
+      if (this.remote?.source.closed) {
         this.clearRemote();
       }
     });

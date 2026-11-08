@@ -32,8 +32,9 @@ class ControlsManager {
     const draggable = shadow.querySelector('.draggable');
     draggable.tabIndex = 0;
     draggable.setAttribute('role', 'button');
+    // The accessible name stays the visible speed text; usage is a description.
     draggable.setAttribute(
-      'aria-label',
+      'aria-description',
       'Playback speed; arrow keys move toolbar, Enter resets speed'
     );
     draggable.addEventListener('keydown', (e) => {
@@ -65,7 +66,6 @@ class ControlsManager {
       'pointerdown',
       (e) => {
         this.actionHandler.runAction(e.target.dataset['action'], false, e);
-        e.stopPropagation();
         e.preventDefault();
       },
       true
@@ -77,7 +77,6 @@ class ControlsManager {
       (e) => {
         const resetTarget = this.config.getKeyBinding('reset') || 1.0;
         this.actionHandler.runAction('reset', resetTarget, e);
-        e.stopPropagation();
         e.preventDefault();
       },
       true
@@ -100,16 +99,6 @@ class ControlsManager {
             this.config.getKeyBinding(e.target.dataset['action']),
             e
           );
-          e.stopPropagation();
-        },
-        true
-      );
-
-      // Touch handler to prevent conflicts
-      button.addEventListener(
-        'touchstart',
-        (e) => {
-          e.stopPropagation();
         },
         true
       );
@@ -202,6 +191,7 @@ class ControlsManager {
   setupClickPrevention(shadow) {
     const controller = shadow.querySelector('#controller');
 
+    // Single propagation boundary for every control inside the toolbar.
     // Stop pointer/touch/double-click events as well as ordinary clicks. The
     // floating host is outside the player, so player capture handlers are not
     // in the event path either. Do not cancel defaults: keyboard focus must work.

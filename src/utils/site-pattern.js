@@ -78,26 +78,22 @@ export function matchSiteRule(rules, href) {
   return null;
 }
 
+// Expose on window.VSC for page-context consumers (settings.js).
+window.VSC = window.VSC || {};
+window.VSC.matchSiteRule = matchSiteRule;
+
 /**
  * Backward-compatible wrapper: check a legacy newline-separated blacklist string.
+ * compilePattern() trims each line and skips blank ones.
  *
  * @param {string} blacklist - Newline-separated pattern string
  * @param {string} href - URL to test
  * @returns {boolean} true if any pattern matches
  */
-// Expose on window.VSC for page-context consumers (settings.js).
-window.VSC = window.VSC || {};
-window.VSC.matchSiteRule = matchSiteRule;
-
 export function isBlacklisted(blacklist, href) {
   if (!blacklist) {
     return false;
   }
-
-  const rules = blacklist
-    .split('\n')
-    .map((line) => ({ pattern: line.replace(regStrip, '') }))
-    .filter((r) => r.pattern.length > 0);
-
+  const rules = blacklist.split('\n').map((pattern) => ({ pattern }));
   return matchSiteRule(rules, href) !== null;
 }

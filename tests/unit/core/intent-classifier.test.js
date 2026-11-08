@@ -104,6 +104,16 @@ describe('IntentClassifier click attribution', () => {
     expect(classifier.classify(context(videoA, 2.0, 200))).toBe(verdicts().TEMPORARY_OVERRIDE);
   });
 
+  it('releases pointer ownership when the owning media consumes its gesture', () => {
+    const classifier = pointerHoldClassifier();
+    const video = document.createElement('video');
+
+    classifier.observePointerDown({ pointerId: 7, timeStamp: 100 }, video);
+    classifier.consumeGesture(video);
+
+    expect(classifier.pointerOwners.has(7)).toBe(false);
+  });
+
   it('binds an unresolved pointer temporary override to its first ratechange target', () => {
     const classifier = pointerHoldClassifier();
     const videoA = document.createElement('video');

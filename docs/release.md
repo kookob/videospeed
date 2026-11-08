@@ -6,7 +6,7 @@
 - The checked-in `manifest.json` keeps `"version": "0.0.0"`; `scripts/build.mjs` writes the package version into `dist/manifest.json`.
 - The release commit is pushed and passes CI before its tag is created.
 - Each release gets one annotated tag. Push that tag explicitly; never use `git push --tags`.
-- GitHub releases start as drafts and use the curated `docs/release-<version>.md` notes.
+- Pushing the tag runs the `Release` workflow, which publishes the GitHub release with the zip and the curated `docs/release-<version>.md` notes (or generated notes when that file is missing).
 - Chrome Web Store upload is manual. No active workflow publishes to the store.
 
 ## Build modes
@@ -142,34 +142,28 @@ git ls-remote --tags origin "refs/tags/v${VERSION}" "refs/tags/v${VERSION}^{}"
 
 Never run `npm version patch|minor|major` followed by a manual tag: npm's default version command already commits and tags. Never push every local tag with `git push --tags`.
 
-## 8. Create and review the draft GitHub release
+## 8. Let the Release workflow publish the GitHub release
 
-First exercise every precondition without creating a release, then create the draft:
+Pushing `v${VERSION}` triggers `.github/workflows/release.yml`. It checks that the tag matches `package.json`, runs lint, tests, and the release build, packages `videospeed-${VERSION}.zip`, and publishes a GitHub release titled `v${VERSION}` with that zip attached. Notes come from `docs/release-${VERSION}.md` (title and status line stripped); without that file GitHub generates them.
+
+Watch the run and confirm the published release:
 
 ```bash
-npm run release:github -- --dry-run
-npm run release:github
+gh run list --workflow Release --limit 3
+gh run watch <run-id> --exit-status
+gh release view "v${VERSION}"
 ```
 
-The helper verifies that:
+The release is public as soon as the workflow finishes. If the workflow fails, fix the cause and re-run it; delete any partial release first (`gh release delete "v${VERSION}"`, keeping the tag).
 
-- the tracked and untracked worktree is clean;
-- the curated notes are tracked, non-empty, and no longer marked draft;
-- `HEAD` is exactly `origin/master`;
-- the local tag is annotated and points at `HEAD`;
-- the remote tag is the same annotated tag object and peels to `HEAD`;
-- a successful `CI` push run exists for that exact commit;
-- that run's `videospeed-release-node-22.x` artifact contains an intact zip with the expected manifest version and no source maps;
-- GitHub operations target the explicit `github.com/owner/repository` derived from the `origin` URL, regardless of `GH_HOST`, `GH_REPO`, or current-directory overrides.
+`npm run release:github` remains as a manual fallback. It creates a draft from the exact-commit CI artifact after verifying the tag, notes, and archive (`--dry-run` checks without creating anything). Use it only when no release exists for the tag.
 
-The non-dry run downloads the verified artifact again and creates a draft titled `v${VERSION}` with that zip and the curated notes. Review the draft on GitHub and independently confirm the tag, notes, archive name, manifest version, and checksum before publishing.
+## 9. Submit to the Chrome Web Store
 
-## 9. Publish and submit to the Chrome Web Store
-
-Publishing the GitHub draft does not upload to the Chrome Web Store. Upload the exact same `release/videospeed-${VERSION}.zip` manually in the Chrome Web Store developer dashboard, complete the store review flow, and verify the published listing after approval.
+The GitHub release does not upload to the Chrome Web Store. Upload the exact same `videospeed-${VERSION}.zip` manually in the Chrome Web Store developer dashboard, complete the store review flow, and verify the published listing after approval.
 
 ## Recovery rules
 
 - Before tagging, fix the release commit normally, push it, and require a fresh exact-commit CI run.
-- After tagging but before publishing, stop rather than moving the tag silently. If the verified commit is wrong, delete the unpublished draft and coordinate a deliberate tag correction or choose a new version.
+- A tag push publishes immediately, so never move a pushed tag. If the tagged commit is wrong, delete the GitHub release and choose a new version.
 - After publishing, never move or reuse the tag. Fix forward with a new patch release.

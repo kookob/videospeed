@@ -54,45 +54,17 @@ class VSCStateManager {
   getAllMediaElements() {
     const elements = [];
 
-    // Clean up disconnected controllers while iterating
-    for (const [id, info] of this.controllers) {
+    // Skip, but keep, detached media: dropping the registration here without
+    // VideoController.remove() would leave video.vsc set, so the same element
+    // reinserted later could never be controlled again. remove() unregisters.
+    for (const info of this.controllers.values()) {
       const video = info.controller?.video || info.element;
       if (video && video.isConnected) {
         elements.push(video);
-      } else {
-        // Remove disconnected controller
-        this.controllers.delete(id);
       }
     }
 
     return elements;
-  }
-
-  /**
-   * Get a media element by controller ID
-   * @param {string} controllerId - Controller ID
-   * @returns {HTMLMediaElement|null} Media element or null
-   */
-  getMediaByControllerId(controllerId) {
-    const info = this.controllers.get(controllerId);
-    return info?.controller?.video || info?.element || null;
-  }
-
-  /**
-   * Get the first available media element
-   * @returns {HTMLMediaElement|null} First media element or null
-   */
-  getFirstMedia() {
-    const elements = this.getAllMediaElements();
-    return elements[0] || null;
-  }
-
-  /**
-   * Check if any controllers are registered
-   * @returns {boolean} True if controllers exist
-   */
-  hasControllers() {
-    return this.controllers.size > 0;
   }
 
   /**

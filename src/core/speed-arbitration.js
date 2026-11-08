@@ -309,11 +309,7 @@ class SpeedArbitration {
 
     // Old timers should not keep running after their entire authority epoch
     // has been superseded. WeakMap records remain lazy and need no traversal.
-    for (const conflict of this.timedConflicts) {
-      clearTimeout(conflict.fightTimer);
-      conflict.fightTimer = null;
-    }
-    this.timedConflicts.clear();
+    this.clearAllFightTimers();
   }
 
   /**
@@ -335,9 +331,11 @@ class SpeedArbitration {
     } else {
       this.config.persistAuthority(speed);
     }
-    const { state } = this.stateFor(video);
+    // persistAuthority() just made desired non-null, so stateFor() already
+    // returns this media's conflict record.
+    const { state, conflict } = this.stateFor(video);
     const result = A.step(state, { type: A.EVENTS.USER_SET, speed });
-    this.applyState(this.conflictFor(video), result.state);
+    this.applyState(conflict, result.state);
   }
 
   /**
@@ -619,12 +617,17 @@ class SpeedArbitration {
     this.timedConflicts.delete(conflict);
   }
 
-  cleanup() {
+  /** Cancel every armed fight timer (authority change or teardown). */
+  clearAllFightTimers() {
     for (const conflict of this.timedConflicts) {
       clearTimeout(conflict.fightTimer);
       conflict.fightTimer = null;
     }
     this.timedConflicts.clear();
+  }
+
+  cleanup() {
+    this.clearAllFightTimers();
     for (const entry of this.pendingTemporaryReleaseTimers) {
       clearTimeout(entry.timer);
     }

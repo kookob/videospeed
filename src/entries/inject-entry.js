@@ -7,7 +7,6 @@
 // Core utilities and constants - must load first
 import '../utils/constants.js';
 import '../utils/logger.js';
-import '../utils/debug-helper.js';
 import '../utils/dom-utils.js';
 
 // Speed arbitration: pure decision core + intent classifier + adapter.
@@ -43,7 +42,6 @@ import '../core/video-controller.js';
 import '../ui/controls.js';
 import '../ui/drag-handler.js';
 import '../ui/shadow-dom.js';
-import '../ui/vsc-controller-element.js';
 import '../ui/floating-controller.js';
 
 // Site-specific handlers - depends on core
@@ -53,8 +51,6 @@ import '../site-handlers/youtube-handler.js';
 import '../site-handlers/facebook-handler.js';
 import '../site-handlers/amazon-handler.js';
 import '../site-handlers/apple-handler.js';
-import '../site-handlers/dailymotion-handler.js';
-import '../site-handlers/frame-handler.js';
 import '../site-handlers/index.js';
 
 // Netflix-specific script

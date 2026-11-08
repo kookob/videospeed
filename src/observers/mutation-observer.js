@@ -11,7 +11,10 @@ class VideoMutationObserver {
     this.onVideoRemoved = onVideoRemoved;
     this.mediaObserver = mediaObserver;
     this.observer = null;
-    this.shadowObservers = new Set();
+    // Roots are weakly held so detached shadow trees can be collected; the
+    // observers themselves are kept so stop() can disconnect them.
+    this.observedShadowRoots = new WeakSet();
+    this.shadowObservers = [];
   }
 
   /**
@@ -44,16 +47,19 @@ class VideoMutationObserver {
    * @private
    */
   processMutations(mutations) {
+    // Sites emit many style/class records per element per batch; recheck each
+    // element once.
+    const visibilityTargets = new Set();
     mutations.forEach((mutation) => {
-      switch (mutation.type) {
-        case 'childList':
-          this.processChildListMutation(mutation);
-          break;
-        case 'attributes':
-          this.processAttributeMutation(mutation);
-          break;
+      if (mutation.type === 'childList') {
+        this.processChildListMutation(mutation);
+      } else if (mutation.attributeName === 'style' || mutation.attributeName === 'class') {
+        visibilityTargets.add(mutation.target);
+      } else if (mutation.type === 'attributes') {
+        this.processAttributeMutation(mutation);
       }
     });
+    visibilityTargets.forEach((element) => this.handleVisibilityChanges(element));
   }
 
   /**
@@ -70,9 +76,9 @@ class VideoMutationObserver {
       }
 
       if (node === document.documentElement) {
-        // Document was replaced (e.g., watch.sling.com uses document.write)
-        window.VSC.logger.debug('Document was replaced, reinitializing');
-        this.onDocumentReplaced();
+        // Document was replaced (e.g., watch.sling.com uses document.write).
+        // Reinitialization is not supported; skip the new root.
+        window.VSC.logger.warn('Document replacement detected - full reinitialization needed');
         return;
       }
 
@@ -95,19 +101,13 @@ class VideoMutationObserver {
    * @private
    */
   processAttributeMutation(mutation) {
-    // Handle style and class changes that might affect video visibility
-    if (mutation.attributeName === 'style' || mutation.attributeName === 'class') {
-      this.handleVisibilityChanges(mutation.target);
-    }
-
-    // Handle special cases like Apple TV+ player
+    // Apple TV+ player (aria-hidden / data-focus-method records only; style
+    // and class records are routed to handleVisibilityChanges).
     if (
-      (mutation.target.attributes['aria-hidden'] &&
-        mutation.target.attributes['aria-hidden'].value === 'false') ||
+      mutation.target.getAttribute('aria-hidden') === 'false' ||
       mutation.target.nodeName === 'APPLE-TV-PLUS-PLAYER'
     ) {
-      const flattenedNodes = window.VSC.DomUtils.getShadow(document.body);
-      const videoNodes = flattenedNodes.filter((x) => x.tagName === 'VIDEO');
+      const videoNodes = window.VSC.DomUtils.findShadowMedia(document, 'video');
 
       for (const node of videoNodes) {
         // Only add vsc the first time for the apple-tv case
@@ -160,14 +160,11 @@ class VideoMutationObserver {
     }
 
     if (video.vsc) {
-      // Video already has controller, check if it should be removed or just hidden
+      // The floating toolbar is independent of player geometry, so a still-valid
+      // video needs no update; only retire controllers whose media became invalid.
       if (!this.mediaObserver.isValidMediaElement(video)) {
         window.VSC.logger.debug('Video became invalid, removing controller');
         video.vsc.remove();
-        video.vsc = null;
-      } else {
-        // Video is still valid, update visibility based on current state
-        video.vsc.updateVisibility();
       }
     } else {
       // Video doesn't have controller, check if it should get one
@@ -187,7 +184,8 @@ class VideoMutationObserver {
    */
   checkForVideoAndShadowRoot(node, parent, added) {
     // Only proceed with removal if node is missing from DOM
-    if (!added && document.body?.contains(node)) {
+    // isConnected also sees nodes moved within shadow trees.
+    if (!added && node.isConnected) {
       return;
     }
 
@@ -220,7 +218,9 @@ class VideoMutationObserver {
 
     // Handle shadow DOM
     if (node.shadowRoot) {
-      this.observeShadowRoot(node.shadowRoot);
+      if (added) {
+        this.observeShadowRoot(node.shadowRoot);
+      }
       children = Array.from(node.shadowRoot.children);
     }
 
@@ -241,7 +241,7 @@ class VideoMutationObserver {
    * @private
    */
   observeShadowRoot(shadowRoot) {
-    if (this.shadowObservers.has(shadowRoot)) {
+    if (this.observedShadowRoots.has(shadowRoot)) {
       return; // Already observing
     }
 
@@ -261,18 +261,10 @@ class VideoMutationObserver {
     };
 
     shadowObserver.observe(shadowRoot, observerOptions);
-    this.shadowObservers.add(shadowRoot);
+    this.observedShadowRoots.add(shadowRoot);
+    this.shadowObservers.push(shadowObserver);
 
     window.VSC.logger.debug('Shadow root observer added');
-  }
-
-  /**
-   * Handle document replacement
-   * @private
-   */
-  onDocumentReplaced() {
-    // This callback should trigger reinitialization
-    window.VSC.logger.warn('Document replacement detected - full reinitialization needed');
   }
 
   /**
@@ -284,12 +276,11 @@ class VideoMutationObserver {
       this.observer = null;
     }
 
-    // Clean up shadow observers
-    this.shadowObservers.forEach((_shadowRoot) => {
-      // Note: We can't access the observer directly, but disconnecting the main
-      // observer should handle most cases. Shadow observers will be garbage collected.
-    });
-    this.shadowObservers.clear();
+    // Shadow observers outlive the main observer unless disconnected; left
+    // running they would keep processing mutations after teardown.
+    this.shadowObservers.forEach((observer) => observer.disconnect());
+    this.shadowObservers = [];
+    this.observedShadowRoots = new WeakSet();
 
     window.VSC.logger.debug('Video mutation observer stopped');
   }

@@ -13,6 +13,36 @@ if (!window.VSC.StorageManager) {
   /** True when chrome.storage.sync is available (extension contexts). */
   const hasChrome = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync;
 
+  /**
+   * Promise wrapper for chrome.storage.sync callbacks with uniform error
+   * reporting (logger + StorageManager.errorCallback).
+   * @param {'set'|'remove'|'clear'} method
+   * @param {*} arg - Argument for the method (omitted for clear)
+   * @param {string} label - Operation name for messages
+   * @param {Object} errorContext - Second argument for errorCallback
+   * @returns {Promise<void>}
+   */
+  function chromeCall(method, arg, label, errorContext) {
+    return new Promise((resolve, reject) => {
+      const done = () => {
+        if (chrome.runtime.lastError) {
+          const message = chrome.runtime.lastError.message;
+          const error = new Error(`Storage ${label} failed: ${message}`);
+          window.VSC.logger?.error?.(`Chrome storage ${label} failed: ${message}`);
+          StorageManager.errorCallback?.(error, errorContext);
+          reject(error);
+          return;
+        }
+        resolve();
+      };
+      if (arg === undefined) {
+        chrome.storage.sync[method](done);
+      } else {
+        chrome.storage.sync[method](arg, done);
+      }
+    });
+  }
+
   class StorageManager {
     static errorCallback = null;
 
@@ -95,23 +125,7 @@ if (!window.VSC.StorageManager) {
      */
     static async set(data) {
       if (hasChrome) {
-        return new Promise((resolve, reject) => {
-          chrome.storage.sync.set(data, () => {
-            if (chrome.runtime.lastError) {
-              const error = new Error(`Storage failed: ${chrome.runtime.lastError.message}`);
-              window.VSC.logger?.error?.(
-                `Chrome storage save failed: ${chrome.runtime.lastError.message}`
-              );
-              if (this.errorCallback) {
-                this.errorCallback(error, data);
-              }
-              reject(error);
-              return;
-            }
-            window.VSC.logger?.debug?.('StorageManager: saved to chrome.storage');
-            resolve();
-          });
-        });
+        return chromeCall('set', data, 'save', data);
       }
 
       // Only lastSpeed can cross the trust boundary to chrome.storage
@@ -131,8 +145,6 @@ if (!window.VSC.StorageManager) {
         );
       }
 
-      // Update local cache regardless (keeps in-memory state current)
-      window.VSC_settings = { ...window.VSC_settings, ...data };
       return Promise.resolve();
     }
 
@@ -142,29 +154,10 @@ if (!window.VSC.StorageManager) {
      * @returns {Promise<void>}
      */
     static async remove(keys) {
-      if (hasChrome) {
-        return new Promise((resolve, reject) => {
-          chrome.storage.sync.remove(keys, () => {
-            if (chrome.runtime.lastError) {
-              const error = new Error(`Storage remove failed: ${chrome.runtime.lastError.message}`);
-              window.VSC.logger?.error?.(
-                `Chrome storage remove failed: ${chrome.runtime.lastError.message}`
-              );
-              if (this.errorCallback) {
-                this.errorCallback(error, { removedKeys: keys });
-              }
-              reject(error);
-              return;
-            }
-            resolve();
-          });
-        });
-      }
-      // No chrome.storage — update local cache only
-      if (window.VSC_settings) {
-        keys.forEach((key) => delete window.VSC_settings[key]);
-      }
-      return Promise.resolve();
+      // MAIN world has no writable storage beyond the lastSpeed bridge.
+      return hasChrome
+        ? chromeCall('remove', keys, 'remove', { removedKeys: keys })
+        : Promise.resolve();
     }
 
     /**
@@ -172,26 +165,9 @@ if (!window.VSC.StorageManager) {
      * @returns {Promise<void>}
      */
     static async clear() {
-      if (hasChrome) {
-        return new Promise((resolve, reject) => {
-          chrome.storage.sync.clear(() => {
-            if (chrome.runtime.lastError) {
-              const error = new Error(`Storage clear failed: ${chrome.runtime.lastError.message}`);
-              window.VSC.logger?.error?.(
-                `Chrome storage clear failed: ${chrome.runtime.lastError.message}`
-              );
-              if (this.errorCallback) {
-                this.errorCallback(error, { operation: 'clear' });
-              }
-              reject(error);
-              return;
-            }
-            resolve();
-          });
-        });
-      }
-      window.VSC_settings = {};
-      return Promise.resolve();
+      return hasChrome
+        ? chromeCall('clear', undefined, 'clear', { operation: 'clear' })
+        : Promise.resolve();
     }
 
     /**
@@ -206,14 +182,7 @@ if (!window.VSC.StorageManager) {
         });
       } else {
         docEl.addEventListener('VSC_STORAGE_CHANGED', (e) => {
-          const changes = e.detail;
-          for (const [key, change] of Object.entries(changes)) {
-            if (change.newValue !== undefined) {
-              window.VSC_settings = window.VSC_settings || {};
-              window.VSC_settings[key] = change.newValue;
-            }
-          }
-          callback(changes);
+          callback(e.detail);
         });
       }
     }

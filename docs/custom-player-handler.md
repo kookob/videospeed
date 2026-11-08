@@ -92,16 +92,6 @@ shouldIgnoreVideo(video) {
 }
 ```
 
-#### `getVideoContainerSelectors()`
-
-Return CSS selectors that help the media scanner find video containers. These are used as hints, not strict requirements.
-
-```js
-getVideoContainerSelectors() {
-  return ['.custom-player', '#main-video-wrapper'];
-}
-```
-
 #### `detectSpecialVideos(document)`
 
 Return an array of video elements that can't be found through normal DOM scanning (e.g., inside shadow DOM or cross-origin-accessible iframes).
@@ -116,29 +106,6 @@ detectSpecialVideos(document) {
 }
 ```
 
-### UI
-
-#### `getControllerPosition(parent, video)`
-
-Controls where the speed controller overlay is inserted in the DOM. Return an object with:
-
-- `insertionPoint` - the element to insert into
-- `insertionMethod` - `'firstChild'`, `'beforeParent'`, or `'afterParent'`
-- `targetParent` - the element used for positioning context
-
-```js
-getControllerPosition(parent, _video) {
-  // Insert into the player wrapper, above the video
-  return {
-    insertionPoint: parent.parentElement,
-    insertionMethod: 'firstChild',
-    targetParent: parent.parentElement,
-  };
-}
-```
-
-Override this when a site's player has overlays or stacking contexts that would cover the default position.
-
 ### Playback
 
 These are the core operations. Each method **owns** the operation entirely -- the base class provides the default implementation, and your override replaces it completely.
@@ -148,6 +115,7 @@ These are the core operations. Each method **owns** the operation entirely -- th
 Called whenever the extension sets playback speed. This includes user-initiated speed changes, programmatic changes, and fight-back speed restoration.
 
 **Default behavior:**
+
 ```js
 handleSpeedChange(video, speed) {
   video.playbackRate = speed;
@@ -170,12 +138,12 @@ handleSpeedChange(video, speed) {
 
 **When is this called?**
 
-| Scenario | Example |
-|---|---|
-| User changes speed | Keyboard shortcut, popup slider |
-| Extension restores speed | Page load with "remember speed" enabled |
-| Fight-back | Site tried to reset speed, extension restores it |
-| Cooldown restore | Site changed speed during cooldown window |
+| Scenario                 | Example                                          |
+| ------------------------ | ------------------------------------------------ |
+| User changes speed       | Keyboard shortcut, popup slider                  |
+| Extension restores speed | Page load with "remember speed" enabled          |
+| Fight-back               | Site tried to reset speed, extension restores it |
+| Cooldown restore         | Site changed speed during cooldown window        |
 
 All paths go through `handleSpeedChange`. There are no direct `video.playbackRate` assignments in the extension's core.
 
@@ -184,6 +152,7 @@ All paths go through `handleSpeedChange`. There are no direct `video.playbackRat
 Called when the user seeks forward or backward. The `seekSeconds` value is negative for rewind.
 
 **Default behavior:**
+
 ```js
 handleSeek(video, seekSeconds) {
   const newTime = Math.max(0, Math.min(video.duration, video.currentTime + seekSeconds));
@@ -232,13 +201,15 @@ When a site externally changes `video.playbackRate` (e.g., the site's own speed 
 
 ## Existing handlers
 
-| Handler | Site | Key overrides |
-|---|---|---|
-| `YouTubeHandler` | youtube.com | Controller positioning, autohide CSS forwarding, video filtering |
-| `NetflixHandler` | netflix.com | Controller positioning, custom seeking via postMessage |
-| `FacebookHandler` | facebook.com | Controller positioning, dynamic content observer |
-| `AmazonHandler` | amazon.com, primevideo.com | Controller positioning, size-based video filtering |
-| `AppleHandler` | tv.apple.com | Controller positioning, shadow DOM video detection |
+| Handler           | Site                       | Key overrides                                                                           |
+| ----------------- | -------------------------- | --------------------------------------------------------------------------------------- |
+| `YouTubeHandler`  | youtube.com                | Gesture classifier rules and media resolution, video filtering, special video detection |
+| `NetflixHandler`  | netflix.com                | Custom seeking via postMessage, video filtering                                         |
+| `FacebookHandler` | facebook.com               | Video filtering                                                                         |
+| `AmazonHandler`   | amazon.com, primevideo.com | Size-based video filtering                                                              |
+| `AppleHandler`    | tv.apple.com               | Shadow DOM video detection                                                              |
+
+Handlers do not position the controller. Every controller is the page-level floating toolbar (`src/ui/floating-controller.js`), mounted outside the player.
 
 ## Testing
 

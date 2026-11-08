@@ -2,8 +2,6 @@
 const MessageTypes = {
   SET_SPEED: 'VSC_SET_SPEED',
   ADJUST_SPEED: 'VSC_ADJUST_SPEED',
-  RESET_SPEED: 'VSC_RESET_SPEED',
-  TOGGLE_DISPLAY: 'VSC_TOGGLE_DISPLAY',
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -20,11 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Toggle based on current state
     const isCurrentlyEnabled = !this.classList.contains('disabled');
     toggleEnabled(!isCurrentlyEnabled, settingsSavedReloadMessage);
-  });
-
-  // Initialize enabled state
-  chrome.storage.sync.get({ enabled: true }, (storage) => {
-    toggleEnabledUI(storage.enabled);
   });
 
   function toggleEnabled(enabled, callback) {
@@ -61,7 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Load settings and initialize UI
   function loadSettingsAndInitialize() {
-    chrome.storage.sync.get(null, (storage) => {
+    chrome.storage.sync.get({ enabled: true, keyBindings: null }, (storage) => {
+      toggleEnabledUI(storage.enabled);
+
       // Find the step values from keyBindings
       let slowerStep = 0.1;
       let fasterStep = 0.1;

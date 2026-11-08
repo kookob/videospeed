@@ -13,8 +13,6 @@ class SiteHandlerManager {
       window.VSC.FacebookHandler,
       window.VSC.AmazonHandler,
       window.VSC.AppleHandler,
-      window.VSC.DailymotionHandler,
-      window.VSC.FrameHandler,
     ];
   }
 
@@ -53,17 +51,6 @@ class SiteHandlerManager {
   initialize(document) {
     const handler = this.getCurrentHandler();
     handler.initialize(document);
-  }
-
-  /**
-   * Get controller positioning for current site
-   * @param {HTMLElement} parent - Parent element
-   * @param {HTMLElement} video - Video element
-   * @returns {Object} Positioning information
-   */
-  getControllerPosition(parent, video) {
-    const handler = this.getCurrentHandler();
-    return handler.getControllerPosition(parent, video);
   }
 
   /**
@@ -130,15 +117,6 @@ class SiteHandlerManager {
   }
 
   /**
-   * Get video container selectors for current site
-   * @returns {Array<string>} CSS selectors
-   */
-  getVideoContainerSelectors() {
-    const handler = this.getCurrentHandler();
-    return handler.getVideoContainerSelectors();
-  }
-
-  /**
    * Detect special videos for current site
    * @param {Document} document - Document object
    * @returns {Array<HTMLMediaElement>} Additional videos found
@@ -156,14 +134,6 @@ class SiteHandlerManager {
       this.currentHandler.cleanup();
       this.currentHandler = null;
     }
-  }
-
-  /**
-   * Force refresh of current handler (useful for SPA navigation)
-   */
-  refresh() {
-    this.cleanup();
-    this.currentHandler = null;
   }
 }
 

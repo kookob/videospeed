@@ -31,7 +31,6 @@ class VideoSpeedExtension {
       this.siteHandlerManager = window.VSC.siteHandlerManager;
       this.VideoMutationObserver = window.VSC.VideoMutationObserver;
       this.MediaElementObserver = window.VSC.MediaElementObserver;
-      this.MESSAGE_TYPES = window.VSC.Constants.MESSAGE_TYPES;
 
       this.logger.info('Video Speed Controller starting...');
 
@@ -42,6 +41,9 @@ class VideoSpeedExtension {
         this.logger.debug('Extension disabled on this site — aborting init');
         return;
       }
+
+      this.onPageHide = () => this.config.flushPendingSave();
+      window.addEventListener('pagehide', this.onPageHide);
 
       // Defer DOM work so page frameworks finish init before we mutate.
       this.deferDOMWork(document);
@@ -95,11 +97,7 @@ class VideoSpeedExtension {
       }
     };
 
-    if (window.requestIdleCallback) {
-      requestIdleCallback(callback);
-    } else {
-      setTimeout(callback, 100);
-    }
+    requestIdleCallback(callback);
   }
 
   /**
@@ -134,11 +132,7 @@ class VideoSpeedExtension {
       }
     };
 
-    if (window.requestIdleCallback) {
-      requestIdleCallback(performChunkedScan);
-    } else {
-      setTimeout(performChunkedScan, 200);
-    }
+    requestIdleCallback(performChunkedScan);
   }
 
   /**
@@ -207,11 +201,7 @@ class VideoSpeedExtension {
       this.initialized = true;
     };
 
-    if (window.requestIdleCallback) {
-      requestIdleCallback(doWork);
-    } else {
-      setTimeout(doWork, 0);
-    }
+    requestIdleCallback(doWork);
   }
 
   /**
@@ -263,7 +253,8 @@ class VideoSpeedExtension {
       const customCSS = this.config.settings.customCSS || '';
       if (customCSS) {
         this._customSheet = new CSSStyleSheet();
-        this._customSheet.replaceSync(customCSS);
+        // User rules may use the same domain markers as the defaults.
+        this._customSheet.replaceSync(this.preprocessDomainCSS(customCSS));
         toAdopt.push(this._customSheet);
       }
 
@@ -285,7 +276,7 @@ class VideoSpeedExtension {
           this._customSheet = new CSSStyleSheet();
           document.adoptedStyleSheets = [...document.adoptedStyleSheets, this._customSheet];
         }
-        this._customSheet.replaceSync(customCSS);
+        this._customSheet.replaceSync(this.preprocessDomainCSS(customCSS));
       } else if (this._customSheet) {
         document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
           (s) => s !== this._customSheet
@@ -339,10 +330,7 @@ class VideoSpeedExtension {
         if (this.deferredMediaListeners.has(video)) {
           return;
         }
-        this.logger.debug(
-          'Deferring controller until loadeddata (readyState=%d)',
-          video.readyState
-        );
+        this.logger.debug(`Deferring controller until loadeddata (readyState=${video.readyState})`);
         const listener = () => {
           this.deferredMediaListeners.delete(video);
           this.onVideoFound(video, parent);
@@ -360,8 +348,7 @@ class VideoSpeedExtension {
         : false;
 
       this.logger.debug(
-        'Attaching controller to new video element',
-        shouldStartHidden ? '(starting hidden)' : ''
+        `Attaching controller to new video element${shouldStartHidden ? ' (starting hidden)' : ''}`
       );
       video.vsc = new this.VideoController(
         video,
@@ -406,6 +393,10 @@ class VideoSpeedExtension {
     // not yet reached the point where there are resources to clean up.
     this.acceptingMedia = false;
     this.clearDeferredMediaListeners();
+    if (this.onPageHide) {
+      window.removeEventListener('pagehide', this.onPageHide);
+      this.onPageHide = null;
+    }
 
     if (!this.initialized) {
       return;
@@ -413,12 +404,13 @@ class VideoSpeedExtension {
 
     this.logger.info('Tearing down Video Speed Controller');
 
-    // Remove all controllers from tracked media elements
-    const videos = window.VSC.stateManager ? window.VSC.stateManager.getAllMediaElements() : [];
-    for (const video of videos) {
-      if (video.vsc) {
-        video.vsc.remove();
-      }
+    // Remove every registered controller, including ones whose media is
+    // currently detached (getAllMediaElements() skips those).
+    const registered = window.VSC.stateManager
+      ? [...window.VSC.stateManager.controllers.values()]
+      : [];
+    for (const info of registered) {
+      info.controller?.remove();
     }
 
     window.VSC.floatingController?.destroy();
@@ -482,6 +474,14 @@ class VideoSpeedExtension {
 
     // Handle namespaced VSC message types
     if (typeof message === 'object' && message.type && message.type.startsWith('VSC_')) {
+      // Speed commands can arrive (popup) before deferred init builds the
+      // action handler; there are no controllers to act on yet.
+      if (
+        !extension.actionHandler &&
+        message.type !== window.VSC.Constants.MESSAGE_TYPES.TEARDOWN
+      ) {
+        return;
+      }
       // Use state manager for complete media element discovery (includes shadow DOM)
       const videos = window.VSC.stateManager ? window.VSC.stateManager.getAllMediaElements() : [];
 
@@ -531,27 +531,6 @@ class VideoSpeedExtension {
             window.VSC.logger?.debug(
               `Adjusted speed by ${delta} on ${videos.length} media elements`
             );
-          }
-          break;
-
-        case window.VSC.Constants.MESSAGE_TYPES.RESET_SPEED: {
-          const authorityBatch = extension.actionHandler.createAuthorityBatch();
-          videos.forEach((video) => {
-            if (video.vsc) {
-              extension.actionHandler.resetSpeed(video, 1.0, undefined, { authorityBatch });
-            } else {
-              // eslint-disable-next-line no-restricted-syntax -- uncontrolled video, outside arbitration domain
-              video.playbackRate = 1.0;
-            }
-          });
-
-          window.VSC.logger?.debug(`Reset speed on ${videos.length} media elements`);
-          break;
-        }
-
-        case window.VSC.Constants.MESSAGE_TYPES.TOGGLE_DISPLAY:
-          if (extension.actionHandler) {
-            extension.actionHandler.runAction('display', null, null);
           }
           break;
 

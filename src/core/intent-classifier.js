@@ -657,14 +657,11 @@ class IntentClassifier {
    * @param {HTMLMediaElement} media
    */
   clearTemporaryHoldsForMedia(media) {
-    const ownedPointers = [];
+    // Owners are { media, downAt } records; deleting during Map iteration is safe.
     for (const [pointerId, owner] of this.pointerOwners) {
-      if (owner === media) {
-        ownedPointers.push(pointerId);
+      if (owner.media === media) {
+        this.removePointer(pointerId);
       }
-    }
-    for (const pointerId of ownedPointers) {
-      this.removePointer(pointerId);
     }
     this.activePointersByMedia.delete(media);
     if (this.spaceHoldMedia === media) {
@@ -695,16 +692,7 @@ class IntentClassifier {
     this.clicksByMedia.delete(media);
     this.seeksByMedia.delete(media);
     this.mediaInitByMedia.delete(media);
-    for (const [pointerId, entry] of this.pointerOwners) {
-      if (entry.media === media) {
-        this.removePointer(pointerId);
-      }
-    }
-    this.activePointersByMedia.delete(media);
-    if (this.spaceHoldMedia === media) {
-      this.spaceHoldActive = false;
-      this.spaceHoldMedia = null;
-    }
+    this.clearTemporaryHoldsForMedia(media);
   }
 
   /** Reset all document-scoped evidence during extension teardown. */
@@ -727,11 +715,8 @@ window.VSC.IntentClassifier.VERDICTS = CLASSIFIER_VERDICTS;
 window.VSC.IntentClassifier.TARGET_RULES = TARGET_RULES;
 window.VSC.IntentClassifier.USER_GESTURE_WINDOW_MS = USER_GESTURE_WINDOW_MS;
 window.VSC.IntentClassifier.CLICK_SEQUENCE_WINDOW_MS = CLICK_SEQUENCE_WINDOW_MS;
-window.VSC.IntentClassifier.SEEK_RESET_WINDOW_MS = SEEK_RESET_WINDOW_MS;
 window.VSC.IntentClassifier.MEDIA_INIT_GRACE_MS = MEDIA_INIT_GRACE_MS;
 window.VSC.IntentClassifier.QUIET_CONTEXT_MS = QUIET_CONTEXT_MS;
-window.VSC.IntentClassifier.TEMPORARY_HOLD_RATE = TEMPORARY_HOLD_RATE;
 window.VSC.IntentClassifier.LONG_PRESS_CLICK_MS = LONG_PRESS_CLICK_MS;
 window.VSC.IntentClassifier.LONG_PRESS_CLICK_GRACE_MS = LONG_PRESS_CLICK_GRACE_MS;
 window.VSC.IntentClassifier.UNRESOLVED_BIND_MAX_AGE_MS = UNRESOLVED_BIND_MAX_AGE_MS;
-window.VSC.IntentClassifier.isNativeSpeedShortcutKey = isNativeSpeedShortcutKey;

@@ -35,7 +35,6 @@ describe('StorageManager — MAIN world (CustomEvent paths)', () => {
     delete globalThis.chrome;
 
     // Clear local caches the module may inspect/write
-    delete window.VSC_settings;
     delete window.VSC_settingsLatch;
 
     // Force vitest to re-evaluate the module file
@@ -171,17 +170,6 @@ describe('StorageManager — MAIN world (CustomEvent paths)', () => {
       delete window.VSC.logger;
     });
 
-    it('updates window.VSC_settings cache regardless of key', async () => {
-      window.VSC_settings = { lastSpeed: 1.0 };
-
-      // Non-bridgeable key should still update the in-memory cache
-      await StorageManager.set({ enabled: false });
-
-      expect(window.VSC_settings.enabled).toBe(false);
-      // Original key preserved
-      expect(window.VSC_settings.lastSpeed).toBe(1.0);
-    });
-
     it('handles non-number lastSpeed gracefully (no dispatch)', async () => {
       const dispatched = vi.fn();
       docEl.addEventListener('VSC_WRITE_STORAGE', dispatched);
@@ -194,9 +182,6 @@ describe('StorageManager — MAIN world (CustomEvent paths)', () => {
 
       expect(dispatched).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('invalid lastSpeed'));
-
-      // Cache should still update (keeps in-memory state consistent)
-      expect(window.VSC_settings.lastSpeed).toBe('fast');
 
       docEl.removeEventListener('VSC_WRITE_STORAGE', dispatched);
       delete window.VSC.logger;
@@ -218,46 +203,6 @@ describe('StorageManager — MAIN world (CustomEvent paths)', () => {
 
       expect(callback).toHaveBeenCalledOnce();
       expect(callback).toHaveBeenCalledWith(changes);
-    });
-
-    it('updates window.VSC_settings cache from changes', () => {
-      const callback = vi.fn();
-      StorageManager.onChanged(callback);
-
-      window.VSC_settings = { lastSpeed: 1.0 };
-
-      const changes = {
-        lastSpeed: { oldValue: 1.0, newValue: 3.0 },
-        rememberSpeed: { oldValue: false, newValue: true },
-      };
-      docEl.dispatchEvent(new CustomEvent('VSC_STORAGE_CHANGED', { detail: changes }));
-
-      expect(window.VSC_settings.lastSpeed).toBe(3.0);
-      expect(window.VSC_settings.rememberSpeed).toBe(true);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // REMOVE / CLEAR
-  // ---------------------------------------------------------------------------
-  describe('remove() / clear()', () => {
-    it('remove() clears keys from local cache', async () => {
-      window.VSC_settings = { lastSpeed: 2.0, enabled: true, rememberSpeed: false };
-
-      await StorageManager.remove(['lastSpeed', 'rememberSpeed']);
-
-      expect(window.VSC_settings.lastSpeed).toBeUndefined();
-      expect(window.VSC_settings.rememberSpeed).toBeUndefined();
-      // Untouched key remains
-      expect(window.VSC_settings.enabled).toBe(true);
-    });
-
-    it('clear() empties local cache', async () => {
-      window.VSC_settings = { lastSpeed: 2.0, enabled: true, rememberSpeed: false };
-
-      await StorageManager.clear();
-
-      expect(window.VSC_settings).toEqual({});
     });
   });
 });

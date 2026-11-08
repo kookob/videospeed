@@ -97,7 +97,6 @@ describe('Inject', () => {
 
     expect(video.vsc).toBeDefined();
     expect(video.vsc instanceof window.VSC.VideoController).toBe(true);
-    expect(video.vsc.parent).toBe(parentNode);
   });
 
   it('onVideoFound should prefer parentElement when available', async () => {
@@ -130,7 +129,6 @@ describe('Inject', () => {
 
     expect(video.vsc).toBeDefined();
     // VideoController constructor uses target.parentElement || parent
-    expect(video.vsc.parent).toBe(parentElement);
   });
 
   it('onVideoFound defers controller when readyState < 2 and video has src', () => {
@@ -250,7 +248,6 @@ describe('Inject', () => {
     extension.onVideoFound(video, fallbackParent);
 
     expect(video.vsc).toBeDefined();
-    expect(video.vsc.parent).toBe(fallbackParent);
   });
 
   it('teardown cancels DOM work queued before initialization completes', () => {

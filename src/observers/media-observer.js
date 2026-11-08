@@ -20,26 +20,8 @@ class MediaElementObserver {
     const audioEnabled = this.config.settings.audioBoolean;
     const mediaTagSelector = audioEnabled ? 'video,audio' : 'video';
 
-    // Find regular media elements
-    const regularMedia = Array.from(document.querySelectorAll(mediaTagSelector));
-    mediaElements.push(...regularMedia);
-
-    // Find media elements in shadow DOMs recursively
-    function findShadowMedia(root, selector) {
-      const results = [];
-      // Add any matching elements in current shadow root
-      results.push(...root.querySelectorAll(selector));
-      // Recursively check all elements with shadow roots
-      root.querySelectorAll('*').forEach((element) => {
-        if (element.shadowRoot) {
-          results.push(...findShadowMedia(element.shadowRoot, selector));
-        }
-      });
-      return results;
-    }
-
-    const shadowMedia = findShadowMedia(document, mediaTagSelector);
-    mediaElements.push(...shadowMedia);
+    // Light DOM plus (recursively) every open shadow root
+    mediaElements.push(...window.VSC.DomUtils.findShadowMedia(document, mediaTagSelector));
 
     // Find site-specific media elements
     const siteSpecificMedia = this.siteHandler.detectSpecialVideos(document);
@@ -118,31 +100,6 @@ class MediaElementObserver {
   }
 
   /**
-   * Get media elements using site-specific container selectors
-   * @param {Document} document - Document to scan
-   * @returns {Array<HTMLMediaElement>} Found media elements
-   */
-  scanSiteSpecificContainers(document) {
-    const mediaElements = [];
-    const containerSelectors = this.siteHandler.getVideoContainerSelectors();
-    const audioEnabled = this.config.settings.audioBoolean;
-
-    containerSelectors.forEach((selector) => {
-      try {
-        const containers = document.querySelectorAll(selector);
-        containers.forEach((container) => {
-          const containerMedia = window.VSC.DomUtils.findMediaElements(container, audioEnabled);
-          mediaElements.push(...containerMedia);
-        });
-      } catch (e) {
-        window.VSC.logger.warn(`Invalid selector "${selector}": ${e.message}`);
-      }
-    });
-
-    return mediaElements;
-  }
-
-  /**
    * Comprehensive scan for all media elements
    * @param {Document} document - Document to scan
    * @returns {Array<HTMLMediaElement>} All found media elements
@@ -153,10 +110,6 @@ class MediaElementObserver {
     // Regular scan
     const regularMedia = this.scanForMedia(document);
     allMedia.push(...regularMedia);
-
-    // Site-specific container scan
-    const containerMedia = this.scanSiteSpecificContainers(document);
-    allMedia.push(...containerMedia);
 
     // Iframe scan
     const iframeMedia = this.scanIframes(document);
@@ -235,16 +188,6 @@ class MediaElementObserver {
 
     // All visible media elements get visible controllers regardless of size
     return false;
-  }
-
-  /**
-   * Find the best parent element for controller positioning
-   * @param {HTMLMediaElement} media - Media element
-   * @returns {HTMLElement} Parent element for positioning
-   */
-  findControllerParent(media) {
-    const positioning = this.siteHandler.getControllerPosition(media.parentElement, media);
-    return positioning.targetParent || media.parentElement;
   }
 }
 

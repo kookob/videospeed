@@ -17,7 +17,6 @@ import {
 function setupMock() {
   installChromeMock();
   resetMockStorage();
-  window.VSC_settings = null;
 }
 
 describe('ControllerCSS', () => {
@@ -40,32 +39,14 @@ describe('ControllerCSS', () => {
 
   it('DEFAULT_CONTROLLER_CSS contains site override rules (not base rule)', () => {
     const css = window.VSC.Constants.DEFAULT_CONTROLLER_CSS;
-    // Base rule (position:absolute etc) is in inject.css for timing safety — not here
+    // Base host rule is in inject.css for timing safety — not here
     expect(css.includes('vsc-controller')).toBe(true);
     expect(!css.startsWith('vsc-controller {')).toBe(true);
   });
 
-  it('DEFAULT_CONTROLLER_CSS contains domain-based rules', () => {
-    const css = window.VSC.Constants.DEFAULT_CONTROLLER_CSS;
-    expect(css.includes('--vsc-domain: "facebook.com"')).toBe(true);
-    expect(css.includes('--vsc-domain: "netflix.com"')).toBe(true);
-    expect(css.includes('--vsc-domain: "chatgpt.com"')).toBe(true);
-    expect(css.includes('--vsc-domain: "drive.google.com"')).toBe(true);
-  });
-
-  it('inject.css pins the absolute controller host origin', () => {
+  it('inject.css leaves host positioning to the floating toolbar', () => {
     const css = readFileSync(join(process.cwd(), 'src/styles/inject.css'), 'utf8');
-    expect(css).toMatch(/vsc-controller\s*\{[^}]*position:\s*absolute;/s);
-    expect(css).toMatch(/vsc-controller\s*\{[^}]*top:\s*0;/s);
-    expect(css).toMatch(/vsc-controller\s*\{[^}]*left:\s*0;/s);
-  });
-
-  it('DEFAULT_CONTROLLER_CSS preserves DOM-contextual YouTube rules', () => {
-    const css = window.VSC.Constants.DEFAULT_CONTROLLER_CSS;
-    expect(css.includes('.ytp-hide-info-bar')).toBe(true);
-    // .ytp-paid-content-overlay-link rule is injected dynamically (YouTube-only)
-    // to avoid [style*=...] attribute selectors in the static stylesheet (#1501).
-    expect(css.includes('#player > vsc-controller')).toBe(true);
+    expect(css).not.toMatch(/position:|top:|left:/);
   });
 
   it('implements YouTube autohide on the light-DOM host without :host-context()', () => {
@@ -87,19 +68,6 @@ describe('ControllerCSS', () => {
     }
 
     expect(window.VSC_controller.preprocessDomainCSS(css, 'example.com')).not.toContain(selector);
-  });
-
-  it('positions the Shorts controller below the native top-left controls', () => {
-    const css = window.VSC.Constants.DEFAULT_CONTROLLER_CSS;
-    const selector = '#shorts-player > vsc-controller';
-    const selectorStart = css.indexOf(selector);
-    const ruleStart = css.lastIndexOf(':root', selectorStart);
-    const rule = css.slice(ruleStart, css.indexOf('}', selectorStart));
-
-    expect(selectorStart).toBeGreaterThanOrEqual(0);
-    expect(rule).toContain('--vsc-domain: "youtube.com"');
-    expect(rule).toContain('position: relative');
-    expect(rule).toContain('top: 60px');
   });
 
   // --- Domain preprocessing (preprocessDomainCSS) ---
@@ -137,8 +105,6 @@ describe('ControllerCSS', () => {
       expect(liveCss.includes('--vsc-domain')).toBe(false);
       expect(liveCss.includes(':root[')).toBe(false);
       expect(liveCss.includes('[style*')).toBe(false);
-      // Unwrapped DOM-contextual rules survive untouched.
-      expect(liveCss.includes('.Shared-Video-player > vsc-controller')).toBe(true);
     });
   });
 

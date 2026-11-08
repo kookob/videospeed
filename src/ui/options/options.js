@@ -19,6 +19,32 @@ window.VSC = window.VSC || {};
 
 let keyBindings = [];
 
+// Single timer so an older message's timeout can't wipe a newer message.
+let statusTimer;
+
+/**
+ * Show a message in #status. Empty text hides it.
+ * @param {string} text
+ * @param {'success'|'error'} [kind]
+ * @param {number} [ms] - auto-clear delay; omit to keep the message
+ */
+function showStatus(text, kind, ms) {
+  clearTimeout(statusTimer);
+  const status = document.getElementById('status');
+  status.textContent = text;
+  status.classList.remove('show', 'success', 'error');
+  if (!text) {
+    return;
+  }
+  status.classList.add('show');
+  if (kind) {
+    status.classList.add(kind);
+  }
+  if (ms) {
+    statusTimer = setTimeout(() => showStatus(''), ms);
+  }
+}
+
 /**
  * Lightweight CSS syntax highlighter for the controller CSS editor.
  * Returns HTML with spans wrapping comments, selectors, properties,
@@ -118,12 +144,6 @@ const SITE_RULE_COLUMNS = [
 ];
 
 /**
- * Validate CSS using the browser's own parser.
- * Updates the textarea border and validation message inline.
- * @param {string} css - CSS text to validate
- * @returns {boolean} true if valid (ok to save)
- */
-/**
  * Find CSS rule blocks that the browser silently dropped.
  * Splits CSS into top-level rule blocks and tries each one individually.
  * @param {string} css - Original CSS text
@@ -168,14 +188,9 @@ function findDroppedRules(css, parsedSheet) {
   const dropped = [];
   const probe = new CSSStyleSheet();
   for (const block of blocks) {
-    try {
-      probe.replaceSync(block);
-      if (probe.cssRules.length === 0) {
-        // Extract the selector part for the message
-        const selector = block.split('{')[0].trim();
-        dropped.push(selector || block.slice(0, 40));
-      }
-    } catch {
+    probe.replaceSync(block);
+    if (probe.cssRules.length === 0) {
+      // Extract the selector part for the message
       const selector = block.split('{')[0].trim();
       dropped.push(selector || block.slice(0, 40));
     }
@@ -183,48 +198,43 @@ function findDroppedRules(css, parsedSheet) {
   return dropped;
 }
 
+/**
+ * Warn inline about CSS the browser's parser dropped. replaceSync never throws
+ * on syntax errors (bad rules are silently discarded), so this is advisory only.
+ * @param {string} css - CSS text to check
+ */
 function validateControllerCSS(css) {
   const textarea = document.getElementById('controllerCSS');
   const msg = document.getElementById('cssValidation');
-  textarea.classList.remove('css-error', 'css-warn');
-  msg.classList.remove('error', 'warn');
+  textarea.classList.remove('css-warn');
+  msg.classList.remove('warn');
   msg.textContent = '';
 
   if (!css.trim()) {
-    return true;
+    return;
   }
 
-  try {
-    const sheet = new CSSStyleSheet();
-    sheet.replaceSync(css);
-    const count = sheet.cssRules.length;
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(css);
+  const count = sheet.cssRules.length;
 
-    if (count === 0) {
-      textarea.classList.add('css-warn');
-      msg.classList.add('warn');
-      msg.textContent = 'No CSS rules parsed — check for syntax errors.';
-      return true;
-    }
+  if (count === 0) {
+    textarea.classList.add('css-warn');
+    msg.classList.add('warn');
+    msg.textContent = 'No CSS rules parsed — check for syntax errors.';
+    return;
+  }
 
-    // Find rules that the browser silently dropped
-    const dropped = findDroppedRules(css, sheet);
-    if (dropped.length > 0) {
-      textarea.classList.add('css-warn');
-      msg.classList.add('warn');
-      msg.textContent = `${count} rule${
-        count !== 1 ? 's' : ''
-      } parsed, ${dropped.length} dropped: ${dropped
-        .map((r) => `"${r.slice(0, 40)}${r.length > 40 ? '...' : ''}"`)
-        .join(', ')}`;
-      return true;
-    }
-
-    return true;
-  } catch (e) {
-    textarea.classList.add('css-error');
-    msg.classList.add('error');
-    msg.textContent = `Syntax error: ${e.message.replace(/^Failed to execute.*: /, '')}`;
-    return false;
+  // Find rules that the browser silently dropped
+  const dropped = findDroppedRules(css, sheet);
+  if (dropped.length > 0) {
+    textarea.classList.add('css-warn');
+    msg.classList.add('warn');
+    msg.textContent = `${count} rule${
+      count !== 1 ? 's' : ''
+    } parsed, ${dropped.length} dropped: ${dropped
+      .map((r) => `"${r.slice(0, 40)}${r.length > 40 ? '...' : ''}"`)
+      .join(', ')}`;
   }
 }
 
@@ -484,28 +494,6 @@ function inputFilterNumbersOnly(e) {
   }
 }
 
-function inputFocus(e) {
-  e.target.value = '';
-}
-
-function inputBlur(e) {
-  // Reconstruct display from stored v2 fields, falling back to legacy
-  if (e.target.code) {
-    e.target.value = formatShortcutDisplay(
-      e.target.displayKey || window.VSC.Constants.displayKeyFromCode(e.target.code),
-      e.target.modifiers
-    );
-  } else if (e.target.code === null) {
-    e.target.value = 'null';
-  } else {
-    // Legacy fallback
-    const kc = e.target.keyCode;
-    e.target.value =
-      keyCodeAliases[kc] || (kc >= 48 && kc <= 90 ? String.fromCharCode(kc) : `Key ${kc}`);
-  }
-  autoSizeKeyInput(e.target);
-}
-
 /**
  * Populate a shortcut input element with binding data.
  * Sets all v2 fields on the DOM element for round-trip through createKeyBindings.
@@ -645,14 +633,6 @@ function collectSiteRules() {
 
 // Validates settings before saving
 function validate() {
-  let valid = true;
-  const status = document.getElementById('status');
-
-  // Clear any existing timeout for validation errors
-  if (window.validationTimeout) {
-    clearTimeout(window.validationTimeout);
-  }
-
   const regEndsWithFlags = window.VSC.Constants.regEndsWithFlags;
 
   // Validate site rules
@@ -673,14 +653,12 @@ function validate() {
         }
         new RegExp(regex, flags);
       } catch {
-        status.textContent = `Error: Invalid site rule regex: "${rule.pattern}". Unable to save.`;
-        status.classList.add('show', 'error');
-        valid = false;
-        window.validationTimeout = setTimeout(() => {
-          status.textContent = '';
-          status.classList.remove('show', 'error');
-        }, 5000);
-        return valid;
+        showStatus(
+          `Error: Invalid site rule regex: "${rule.pattern}". Unable to save.`,
+          'error',
+          5000
+        );
+        return false;
       }
     }
 
@@ -690,21 +668,19 @@ function validate() {
         rule.speed < window.VSC.Constants.SPEED_LIMITS.MIN ||
         rule.speed > window.VSC.Constants.SPEED_LIMITS.MAX
       ) {
-        status.textContent = `Error: Speed for "${rule.pattern}" must be between ${
-          window.VSC.Constants.SPEED_LIMITS.MIN
-        } and ${window.VSC.Constants.SPEED_LIMITS.MAX}.`;
-        status.classList.add('show', 'error');
-        valid = false;
-        window.validationTimeout = setTimeout(() => {
-          status.textContent = '';
-          status.classList.remove('show', 'error');
-        }, 5000);
-        return valid;
+        showStatus(
+          `Error: Speed for "${rule.pattern}" must be between ${
+            window.VSC.Constants.SPEED_LIMITS.MIN
+          } and ${window.VSC.Constants.SPEED_LIMITS.MAX}.`,
+          'error',
+          5000
+        );
+        return false;
       }
     }
   }
 
-  return valid;
+  return true;
 }
 
 // Saves options using VideoSpeedConfig system
@@ -713,9 +689,7 @@ async function save_options() {
     return;
   }
 
-  const status = document.getElementById('status');
-  status.textContent = '';
-  status.classList.remove('show', 'success', 'error');
+  showStatus('');
 
   try {
     keyBindings = [];
@@ -731,32 +705,18 @@ async function save_options() {
     const siteRules = collectSiteRules();
     const customCSS = document.getElementById('controllerCSS').value;
 
-    // Validate CSS syntax — block save on parse error
-    if (!validateControllerCSS(customCSS)) {
-      status.textContent = 'Error: Controller CSS has syntax errors. Fix them before saving.';
-      status.classList.add('show', 'error');
-      setTimeout(() => {
-        status.textContent = '';
-        status.classList.remove('show', 'error');
-      }, 5000);
-      return;
-    }
+    // Refresh the inline dropped-rule warning (advisory; never blocks save)
+    validateControllerCSS(customCSS);
 
     // Byte-length guard for chrome.storage.sync (8KB per-item limit)
     const cssByteSize = new Blob([customCSS]).size;
     if (cssByteSize > 8192) {
-      status.textContent = `Error: Controller CSS exceeds 8KB storage limit (${Math.round(cssByteSize / 1024)}KB). Reduce CSS size.`;
-      status.classList.add('show', 'error');
-      setTimeout(() => {
-        status.textContent = '';
-        status.classList.remove('show', 'error');
-      }, 5000);
+      showStatus(
+        `Error: Controller CSS exceeds 8KB storage limit (${Math.round(cssByteSize / 1024)}KB). Reduce CSS size.`,
+        'error',
+        5000
+      );
       return;
-    }
-
-    // Ensure VideoSpeedConfig singleton is initialized
-    if (!window.VSC.videoSpeedConfig) {
-      window.VSC.videoSpeedConfig = new window.VSC.VideoSpeedConfig();
     }
 
     // Use VideoSpeedConfig to save settings (sync storage)
@@ -777,32 +737,17 @@ async function save_options() {
     const ok = await window.VSC.videoSpeedConfig.save(settingsToSave);
 
     if (!ok) {
-      status.textContent = 'Error: failed to save options to storage';
-      status.classList.add('show', 'error');
-      setTimeout(() => {
-        status.textContent = '';
-        status.classList.remove('show', 'error');
-      }, 3000);
+      showStatus('Error: failed to save options to storage', 'error', 3000);
     }
   } catch (error) {
     console.error('Failed to save options:', error);
-    status.textContent = `Error saving options: ${error.message}`;
-    status.classList.add('show', 'error');
-    setTimeout(() => {
-      status.textContent = '';
-      status.classList.remove('show', 'error');
-    }, 3000);
+    showStatus(`Error saving options: ${error.message}`, 'error', 3000);
   }
 }
 
 // Restores options using VideoSpeedConfig system
 async function restore_options() {
   try {
-    // Ensure VideoSpeedConfig singleton is initialized
-    if (!window.VSC.videoSpeedConfig) {
-      window.VSC.videoSpeedConfig = new window.VSC.VideoSpeedConfig();
-    }
-
     // Load settings using VideoSpeedConfig
     await window.VSC.videoSpeedConfig.load();
     const storage = window.VSC.videoSpeedConfig.settings;
@@ -842,29 +787,16 @@ async function restore_options() {
     }
   } catch (error) {
     console.error('Failed to restore options:', error);
-    document.getElementById('status').textContent = `Error loading options: ${error.message}`;
-    document.getElementById('status').classList.add('show', 'error');
-    setTimeout(() => {
-      document.getElementById('status').textContent = '';
-      document.getElementById('status').classList.remove('show', 'error');
-    }, 3000);
+    showStatus(`Error loading options: ${error.message}`, 'error', 3000);
   }
 }
 
 async function restore_defaults() {
   try {
-    const status = document.getElementById('status');
-    status.textContent = 'Restoring defaults...';
-    status.classList.remove('success', 'error');
-    status.classList.add('show');
+    showStatus('Restoring defaults...');
 
     // Clear all storage
     await window.VSC.StorageManager.clear();
-
-    // Ensure VideoSpeedConfig singleton is initialized
-    if (!window.VSC.videoSpeedConfig) {
-      window.VSC.videoSpeedConfig = new window.VSC.VideoSpeedConfig();
-    }
 
     const defaults = { ...window.VSC.Constants.DEFAULT_SETTINGS, schemaVersion: 2 };
     const ok = await window.VSC.videoSpeedConfig.save(defaults);
@@ -875,20 +807,10 @@ async function restore_defaults() {
     // Reload the options page (clears and re-renders all shortcut rows)
     await restore_options();
 
-    status.textContent = 'Default options restored';
-    status.classList.add('success');
-    setTimeout(() => {
-      status.textContent = '';
-      status.classList.remove('show', 'success');
-    }, 2000);
+    showStatus('Default options restored', 'success', 2000);
   } catch (error) {
     console.error('Failed to restore defaults:', error);
-    status.textContent = `Error restoring defaults: ${error.message}`;
-    status.classList.add('show', 'error');
-    setTimeout(() => {
-      status.textContent = '';
-      status.classList.remove('show', 'error');
-    }, 3000);
+    showStatus(`Error restoring defaults: ${error.message}`, 'error', 3000);
   }
 }
 
@@ -896,12 +818,7 @@ async function restore_defaults() {
  * Export all settings as a JSON file download.
  */
 async function export_settings() {
-  const status = document.getElementById('status');
   try {
-    // Ensure config is loaded
-    if (!window.VSC.videoSpeedConfig) {
-      window.VSC.videoSpeedConfig = new window.VSC.VideoSpeedConfig();
-    }
     await window.VSC.videoSpeedConfig.load();
     const settings = { ...window.VSC.videoSpeedConfig.settings };
 
@@ -915,21 +832,10 @@ async function export_settings() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    status.textContent = 'Settings exported';
-    status.classList.remove('error');
-    status.classList.add('show', 'success');
-    setTimeout(() => {
-      status.textContent = '';
-      status.classList.remove('show', 'success');
-    }, 2000);
+    showStatus('Settings exported', 'success', 2000);
   } catch (error) {
     console.error('Failed to export settings:', error);
-    status.textContent = `Error exporting settings: ${error.message}`;
-    status.classList.add('show', 'error');
-    setTimeout(() => {
-      status.textContent = '';
-      status.classList.remove('show', 'error');
-    }, 3000);
+    showStatus(`Error exporting settings: ${error.message}`, 'error', 3000);
   }
 }
 
@@ -941,7 +847,6 @@ function import_settings() {
 }
 
 async function handleImportFile(event) {
-  const status = document.getElementById('status');
   const file = event.target.files[0];
   if (!file) {
     return;
@@ -963,11 +868,6 @@ async function handleImportFile(event) {
       throw new Error('File does not look like a Video Speed Controller settings file');
     }
 
-    // Ensure config is initialized
-    if (!window.VSC.videoSpeedConfig) {
-      window.VSC.videoSpeedConfig = new window.VSC.VideoSpeedConfig();
-    }
-
     // Clear existing storage and write the imported settings
     await window.VSC.StorageManager.clear();
     const ok = await window.VSC.videoSpeedConfig.save(imported);
@@ -975,29 +875,13 @@ async function handleImportFile(event) {
       throw new Error('Failed to write imported settings to storage');
     }
 
-    // Remove custom shortcut rows before reloading UI
-    document.querySelectorAll('.removeParent').forEach((button) => {
-      button.click();
-    });
-
-    // Reload settings into the UI
+    // Reload settings into the UI (clears and re-renders all rows)
     await restore_options();
 
-    status.textContent = 'Settings imported successfully';
-    status.classList.remove('error');
-    status.classList.add('show', 'success');
-    setTimeout(() => {
-      status.textContent = '';
-      status.classList.remove('show', 'success');
-    }, 2000);
+    showStatus('Settings imported successfully', 'success', 2000);
   } catch (error) {
     console.error('Failed to import settings:', error);
-    status.textContent = `Import failed: ${error.message}`;
-    status.classList.add('show', 'error');
-    setTimeout(() => {
-      status.textContent = '';
-      status.classList.remove('show', 'error');
-    }, 4000);
+    showStatus(`Import failed: ${error.message}`, 'error', 4000);
   }
 }
 
@@ -1053,7 +937,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('restore').addEventListener('click', async (e) => {
     e.preventDefault();
     await restore_defaults();
-    markDirty();
   });
 
   document.getElementById('export').addEventListener('click', (e) => {
@@ -1121,12 +1004,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.addEventListener('beforeinput', (event) => {
     eventCaller(event, 'customValue', inputFilterNumbersOnly);
-  });
-  document.addEventListener('focus', (event) => {
-    eventCaller(event, 'customKey', inputFocus);
-  });
-  document.addEventListener('blur', (event) => {
-    eventCaller(event, 'customKey', inputBlur);
   });
   document.addEventListener('keydown', (event) => {
     eventCaller(event, 'customKey', recordKeyPress);
