@@ -1,9 +1,27 @@
-# [Install from Chrome Web Store][chrome-web-store-link]
+# Video Speed Controller (floating toolbar fork)
 
-[![Chrome Web Store][chrome-web-store-version]][chrome-web-store-link] [![Chrome Web Store Users][chrome-web-store-users-badge]][chrome-web-store-link] [![Chrome Web Store Users][chrome-web-store-stars]][chrome-web-store-link]
+[![GitHub release][github-release-badge]][github-release-link]
 
 **Video Speed Controller** gives you fine-grained control over any HTML5 video
 or audio element, on any site.
+
+This is a fork of [igrigorik/videospeed][upstream]. It replaces the per-player
+overlay with one page-level floating toolbar (see [Differences from
+upstream](#differences-from-upstream)) and is distributed through GitHub
+Releases, not the Chrome Web Store. The original extension is still available
+from the [Chrome Web Store][chrome-web-store-link].
+
+## Install
+
+1. Download `videospeed-<version>.zip` from the [latest release][github-release-link]
+   and unzip it.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked** and select the unzipped folder.
+
+To update, replace the folder's contents with the new release and click the
+reload icon on the extension's card. If the Chrome Web Store version is also
+installed, disable it: both would handle the same shortcuts. Settings are not
+shared between the two, because each install has its own extension ID.
 
 ## The science of accelerated playback
 
@@ -62,8 +80,21 @@ for the current tab (when session storage is available).
 
 Embedded players delegate controls to the top page when the extension is active
 there, with a local fallback otherwise. Fullscreen containers use local controls.
-Native video-only fullscreen can restrict custom overlays. Page-level floating
-positioning replaces the legacy site-specific player offsets.
+Native video-only fullscreen can restrict custom overlays.
+
+## Differences from upstream
+
+- **Floating toolbar instead of per-player overlays.** One toolbar per page
+  follows the most recently played video, sits outside the player (so clicks
+  never pause it), collapses to the speed badge, and can be dragged anywhere.
+  Upstream inserts an overlay into every player with site-specific offsets.
+- **Audio** keeps its keyboard shortcuts but never shows a toolbar.
+- **Opacity** setting applies to the idle toolbar; it becomes fully opaque on
+  hover, focus, or drag.
+- **YouTube autohide** hides the toolbar only in fullscreen, where it is mounted
+  inside the player.
+- **Releases** are published automatically as installable zips when a version
+  tag is pushed.
 
 ## Default keyboard shortcuts
 
@@ -87,9 +118,9 @@ for them to take effect.
 
 (MIT License) - Copyright (c) 2014 Ilya Grigorik
 
-[chrome-web-store-version]: https://img.shields.io/chrome-web-store/v/nffaoalbilbmmfgbnbgppjihopabppdk?label=Chrome%20Web%20Store
-[chrome-web-store-users-badge]: https://img.shields.io/chrome-web-store/users/nffaoalbilbmmfgbnbgppjihopabppdk
-[chrome-web-store-stars]: https://img.shields.io/chrome-web-store/stars/nffaoalbilbmmfgbnbgppjihopabppdk
-[github-release-badge]: https://img.shields.io/github/v/release/igrigorik/videospeed
+This fork is distributed under the same license.
+
+[upstream]: https://github.com/igrigorik/videospeed
+[github-release-badge]: https://img.shields.io/github/v/release/kookob/videospeed
+[github-release-link]: https://github.com/kookob/videospeed/releases/latest
 [chrome-web-store-link]: https://chromewebstore.google.com/detail/video-speed-controller/nffaoalbilbmmfgbnbgppjihopabppdk
-[github-release-link]: https://github.com/igrigorik/videospeed/releases

@@ -988,11 +988,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // About and feedback button event listeners
   document.getElementById('about').addEventListener('click', () => {
-    window.open('https://github.com/igrigorik/videospeed');
+    window.open('https://github.com/kookob/videospeed');
   });
 
   document.getElementById('feedback').addEventListener('click', () => {
-    window.open('https://github.com/igrigorik/videospeed/issues');
+    window.open('https://github.com/kookob/videospeed/issues');
   });
 
   function eventCaller(event, className, funcName) {

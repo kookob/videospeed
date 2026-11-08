@@ -3,6 +3,11 @@
 Video Speed Controller is an open source project licensed under the MIT license
 with many contributors. Contributions are welcome, and greatly appreciated.
 
+This repository is a fork of [igrigorik/videospeed](https://github.com/igrigorik/videospeed)
+with a page-level floating toolbar. Contributions to the fork go to
+<https://github.com/kookob/videospeed>; changes that apply to the original
+extension are better proposed upstream.
+
 If you would like to help, getting started is easy.
 
 ## Get Started
@@ -30,7 +35,7 @@ a POSIX shell. Windows users need:
 ### Contribution Process
 
 1. You must have a github account and be logged in
-2. Open <https://github.com/igrigorik/videospeed/>
+2. Open <https://github.com/kookob/videospeed/>
 3. Fork the repo by clicking the "Fork" link on the top-right corner of the page
 4. Once the fork is ready, clone to your local PC
 
@@ -146,7 +151,7 @@ npm run test:tlc
 You should always be working with the latest version of the tool to make pull
 requests easy. If you want to do this easily, just add a second remote to your
 local git repo like this
-`git remote add upstream https://github.com/igrigorik/videospeed.git`
+`git remote add upstream https://github.com/kookob/videospeed.git`
 
 Now any time you like to pull the latest version in to your local branch you can
 simply issue the command `git pull upstream master`
