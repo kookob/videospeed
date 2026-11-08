@@ -210,6 +210,22 @@ class ActionHandler {
    * @returns {boolean|null} Whether it is rendered, or null when unavailable
    */
   isControllerVisible(controller) {
+    const floating = window.VSC.floatingController;
+    if (floating?.delegated && floating.active?.div === controller && !document.fullscreenElement) {
+      // The local shadow UI is intentionally hidden when its mirror is in the
+      // top document. Read the mirrored policy, not that local display:none.
+      if (
+        controller.classList.contains('vsc-nosource') ||
+        controller.dataset.vscVisibility === 'hide'
+      ) {
+        return false;
+      }
+      return (
+        controller.dataset.vscVisibility === 'show' ||
+        controller.classList.contains('vsc-show') ||
+        !controller.classList.contains('vsc-hidden')
+      );
+    }
     const innerController = controller.shadowRoot
       ? window.VSC.ShadowDOMManager.getController(controller.shadowRoot)
       : null;

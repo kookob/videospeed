@@ -80,5 +80,11 @@ beforeAll(async () => {
 
 // Reset mock storage between tests for isolation
 beforeEach(() => {
+  // inject.js can finish its idle startup between tests. Never leak its
+  // document-level toolbar coordinator into standalone controller tests.
+  window.VSC?.floatingController?.destroy();
+  if (window.VSC) {
+    window.VSC.floatingController = null;
+  }
   resetMockStorage();
 });

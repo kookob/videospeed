@@ -30,6 +30,35 @@ class ControlsManager {
    */
   setupDragHandler(shadow) {
     const draggable = shadow.querySelector('.draggable');
+    draggable.tabIndex = 0;
+    draggable.setAttribute('role', 'button');
+    draggable.setAttribute(
+      'aria-label',
+      'Playback speed; arrow keys move toolbar, Enter resets speed'
+    );
+    draggable.addEventListener('keydown', (e) => {
+      const floating = window.VSC.floatingController;
+      const directions = {
+        ArrowLeft: [-16, 0],
+        ArrowRight: [16, 0],
+        ArrowUp: [0, -16],
+        ArrowDown: [0, 16],
+      };
+      if (floating?.host === shadow.host && directions[e.key]) {
+        const [dx, dy] = directions[e.key];
+        floating.move(
+          parseFloat(shadow.host.style.left) + dx,
+          parseFloat(shadow.host.style.top) + dy,
+          true
+        );
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        this.actionHandler.runAction('reset', this.config.getKeyBinding('reset') || 1, e);
+      } else {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    });
 
     // Pointer-based drag (unified mouse + touch)
     draggable.addEventListener(
@@ -173,9 +202,21 @@ class ControlsManager {
   setupClickPrevention(shadow) {
     const controller = shadow.querySelector('#controller');
 
-    // Prevent clicks from bubbling up to page
-    controller.addEventListener('click', (e) => e.stopPropagation(), false);
-    controller.addEventListener('mousedown', (e) => e.stopPropagation(), false);
+    // Stop pointer/touch/double-click events as well as ordinary clicks. The
+    // floating host is outside the player, so player capture handlers are not
+    // in the event path either. Do not cancel defaults: keyboard focus must work.
+    for (const type of [
+      'click',
+      'dblclick',
+      'mousedown',
+      'mouseup',
+      'pointerdown',
+      'pointerup',
+      'touchstart',
+      'touchend',
+    ]) {
+      controller.addEventListener(type, (e) => e.stopPropagation(), false);
+    }
   }
 }
 

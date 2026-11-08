@@ -12,7 +12,13 @@ class DragHandler {
    * @param {PointerEvent|MouseEvent} e - Pointer/mouse event
    */
   static handleDrag(video, e) {
+    if (e.button !== undefined && e.button !== 0) {
+      return;
+    }
     const controller = video.vsc.div;
+    const floating = controller.hasAttribute('data-vsc-floating')
+      ? window.VSC.floatingController
+      : null;
     const shadowController = controller.shadowRoot.querySelector('#controller');
 
     video.classList.add('vcs-dragging');
@@ -20,8 +26,8 @@ class DragHandler {
 
     const initialXY = [e.clientX, e.clientY];
     const initialControllerXY = [
-      parseInt(shadowController.style.left) || 0,
-      parseInt(shadowController.style.top) || 0,
+      parseFloat(floating ? controller.style.left : shadowController.style.left) || 0,
+      parseFloat(floating ? controller.style.top : shadowController.style.top) || 0,
     ];
 
     const draggable = e.target;
@@ -34,8 +40,12 @@ class DragHandler {
     const onMove = (ev) => {
       const dx = ev.clientX - initialXY[0];
       const dy = ev.clientY - initialXY[1];
-      shadowController.style.left = `${initialControllerXY[0] + dx}px`;
-      shadowController.style.top = `${initialControllerXY[1] + dy}px`;
+      if (floating) {
+        floating.move(initialControllerXY[0] + dx, initialControllerXY[1] + dy);
+      } else {
+        shadowController.style.left = `${initialControllerXY[0] + dx}px`;
+        shadowController.style.top = `${initialControllerXY[1] + dy}px`;
+      }
     };
 
     const onEnd = () => {
@@ -46,6 +56,9 @@ class DragHandler {
       draggable.removeEventListener('mousemove', onMove);
       draggable.removeEventListener('mouseup', onEnd);
 
+      if (floating?.host === controller) {
+        floating.move(parseFloat(controller.style.left), parseFloat(controller.style.top), true);
+      }
       shadowController.classList.remove('dragging');
       video.classList.remove('vcs-dragging');
 
