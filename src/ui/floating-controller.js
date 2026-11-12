@@ -17,7 +17,7 @@ class FloatingController {
     this.delegated = false;
     this.position = null;
     try {
-      const saved = JSON.parse(sessionStorage.getItem('vsc-floating-position'));
+      const saved = JSON.parse(localStorage.getItem('vsc-floating-position'));
       if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
         this.position = saved;
       }
@@ -170,8 +170,9 @@ class FloatingController {
     const vh = document.documentElement.clientHeight || window.innerHeight;
     const maxX = Math.max(0, vw - width - 12);
     const maxY = Math.max(0, vh - height - 12);
-    const x = Math.max(0, Math.min(this.position?.x ?? maxX, maxX));
-    const y = Math.max(0, Math.min(this.position?.y ?? vh * 0.3, maxY));
+    // Default: top center.
+    const x = Math.max(0, Math.min(this.position?.x ?? (vw - width) / 2, maxX));
+    const y = Math.max(0, Math.min(this.position?.y ?? 12, maxY));
     host.style.setProperty('left', `${x}px`, 'important');
     host.style.setProperty('top', `${y}px`, 'important');
     // Expand hover buttons toward the roomier side so they stay on screen.
@@ -188,7 +189,7 @@ class FloatingController {
       // Persist the clamped coordinates, not an offscreen pointer position.
       this.position = { x: parseFloat(this.host.style.left), y: parseFloat(this.host.style.top) };
       try {
-        sessionStorage.setItem('vsc-floating-position', JSON.stringify(this.position));
+        localStorage.setItem('vsc-floating-position', JSON.stringify(this.position));
       } catch {
         /* Optional persistence. */
       }

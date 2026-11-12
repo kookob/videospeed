@@ -6,7 +6,7 @@ describe('page floating controller', () => {
   const controllers = [];
 
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     config = window.VSC.videoSpeedConfig;
     config.settings.startHidden = false;
     config.settings.audioBoolean = true;
@@ -24,7 +24,7 @@ describe('page floating controller', () => {
     manager.destroy();
     window.VSC.floatingController = null;
     document.querySelectorAll('vsc-controller, .test-player, iframe').forEach((el) => el.remove());
-    sessionStorage.clear();
+    localStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -152,7 +152,7 @@ describe('page floating controller', () => {
     manager.move(-100, 100000, true);
     expect(parseFloat(controller.div.style.left)).toBe(0);
     expect(parseFloat(controller.div.style.top)).toBeLessThan(window.innerHeight);
-    const stored = JSON.parse(sessionStorage.getItem('vsc-floating-position'));
+    const stored = JSON.parse(localStorage.getItem('vsc-floating-position'));
     manager.destroy();
     manager = new window.VSC.FloatingController(config, actions);
     window.VSC.floatingController = manager;
@@ -164,7 +164,9 @@ describe('page floating controller', () => {
   it('expands hover buttons toward the side with more room', () => {
     const controller = add();
     play(controller);
-    expect(controller.div.dataset.vscExpand).toBe('left'); // default: docked right
+    expect(controller.div.dataset.vscExpand).toBe('right'); // default: top center
+    manager.move(100000, 0);
+    expect(controller.div.dataset.vscExpand).toBe('left');
     manager.move(0, 0);
     expect(controller.div.dataset.vscExpand).toBe('right');
   });

@@ -78,7 +78,7 @@ describe('DragAndReset', () => {
 
       draggable.dispatchEvent(pointer('pointerup', 30, 50));
       expect(shadowController.classList.contains('dragging')).toBe(false);
-      expect(JSON.parse(sessionStorage.getItem('vsc-floating-position'))).toEqual({
+      expect(JSON.parse(localStorage.getItem('vsc-floating-position'))).toEqual({
         x: 120,
         y: 140,
       });
@@ -86,7 +86,7 @@ describe('DragAndReset', () => {
     } finally {
       floating.destroy();
       window.VSC.floatingController = null;
-      sessionStorage.clear();
+      localStorage.clear();
     }
   });
 
